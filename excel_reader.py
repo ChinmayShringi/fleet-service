@@ -77,7 +77,7 @@ def create_ev_assumption_pivot_table():
                 row_data[f'{year} Replacement Cost (Est.)'] = cost
             else:
                 row_data[f'{year} Vehicle Count'] = 0
-                row_data[f'{year} Replacement Cost (Est.)'] = 0
+                row_data[f'{year}'] = 0
         combined_data.append(row_data)
     
     ev_pivot = pd.DataFrame(combined_data)
@@ -178,21 +178,46 @@ def create_ev_assumption_pivot_table():
         for year in years:
             if i == 0:  # H -EV Purchases Net Impact to Capital Budget
                 # Get Freightliner EV Premium Impact value for this year
+                ev_row[f'{year} Vehicle Count'] = 0
                 if not freightliner_impact_row.empty:
-                    ev_row[f'{year} Vehicle Count'] = freightliner_impact_row.iloc[0].get(f'{year} Replacement Cost (Est.)', 0)
+                    ev_row[f'{year} Replacement Cost (Est.)'] = freightliner_impact_row.iloc[0].get(f'{year}', 0)
                 else:
-                    ev_row[f'{year} Vehicle Count'] = 0
-                ev_row[f'{year} Replacement Cost (Est.)'] = 0
+                    ev_row[f'{year} Replacement Cost (Est.)'] = 0
                 
             elif i == 1:  # L - EV Purchased Net Impact to Capital Budget  
                 # Sum of Van + Car/SUV + Pickup EV Premium Impact values (taking magnitude)
-                van_impact = abs(van_impact_row.iloc[0].get(f'{year} Replacement Cost (Est.)', 0)) if not van_impact_row.empty else 0
-                car_suv_impact = abs(car_suv_impact_row.iloc[0].get(f'{year} Replacement Cost (Est.)', 0)) if not car_suv_impact_row.empty else 0
-                pickup_impact = abs(pickup_impact_row.iloc[0].get(f'{year} Replacement Cost (Est.)', 0)) if not pickup_impact_row.empty else 0
+                van_impact = abs(van_impact_row.iloc[0].get(f'{year}', 0)) if not van_impact_row.empty else 0
+                car_suv_impact = abs(car_suv_impact_row.iloc[0].get(f'{year}', 0)) if not car_suv_impact_row.empty else 0
+                pickup_impact = abs(pickup_impact_row.iloc[0].get(f'{year}', 0)) if not pickup_impact_row.empty else 0
                 
                 total_light_impact = van_impact + car_suv_impact + pickup_impact
-                ev_row[f'{year} Vehicle Count'] = total_light_impact
-                ev_row[f'{year} Replacement Cost (Est.)'] = 0
+                ev_row[f'{year} Vehicle Count'] = 0
+                ev_row[f'{year} Replacement Cost (Est.)'] = total_light_impact
+                
+            elif i == 2:  # Adjusted Budget to Reflect Avg EV Incremental
+                # Vehicle Count = same as "Total pre EV with Radio Installs"
+                # Find the "Total pre EV with Radio Installs" row value
+                total_pre_ev_count = 0
+                total_pre_ev_cost = 0
+                for prev_idx, prev_row_data in enumerate(ev_pivot.to_dict('records')):
+                    if prev_row_data.get('Vehicle Class') == 'Total pre EV with Radio Installs':
+                        total_pre_ev_count = prev_row_data.get(f'{year} Vehicle Count', 0)
+                        total_pre_ev_cost = prev_row_data.get(f'{year} Replacement Cost (Est.)', 0)
+                        break
+                
+                # Get H and L EV impact values we just calculated
+                h_ev_impact = 0
+                l_ev_impact = 0
+                if not freightliner_impact_row.empty:
+                    h_ev_impact = freightliner_impact_row.iloc[0].get(f'{year}', 0)
+                if len(ev_rows) > 1:  # L row exists
+                    van_impact = abs(van_impact_row.iloc[0].get(f'{year}', 0)) if not van_impact_row.empty else 0
+                    car_suv_impact = abs(car_suv_impact_row.iloc[0].get(f'{year}', 0)) if not car_suv_impact_row.empty else 0
+                    pickup_impact = abs(pickup_impact_row.iloc[0].get(f'{year}', 0)) if not pickup_impact_row.empty else 0
+                    l_ev_impact = van_impact + car_suv_impact + pickup_impact
+                
+                ev_row[f'{year} Vehicle Count'] = total_pre_ev_count
+                ev_row[f'{year} Replacement Cost (Est.)'] = total_pre_ev_cost + h_ev_impact + l_ev_impact
                 
             else:
                 # Placeholder values for other rows
@@ -219,52 +244,35 @@ def create_ev_assumption_pivot_table():
     # Save the EV assumption pivot table to output folder
     output_path = 'output/EV_ASSUMPTION_Analysis.xlsx'
     
-    # Add all dedicated EV analyses to the same sheet (below the main summary)
-    print("\nAdding dedicated EV analyses to the same sheet...")
+    # Individual EV analyses will be in separate sheets to avoid column format conflicts
+    print("\nPreparing individual EV analyses for separate sheets...")
     
-    # Add a spacing row before dedicated analyses
-    spacing_row = {'Vehicle Class': ''}
-    for year in years:
-        spacing_row[f'{year} Vehicle Count'] = 0
-        spacing_row[f'{year} Replacement Cost (Est.)'] = 0
-    ev_pivot = pd.concat([ev_pivot, pd.DataFrame([spacing_row])], ignore_index=True)
-    
-    # Add Freightliner EV Analysis
-    print("  Adding Freightliner EV Analysis...")
+    # Create individual analysis DataFrames
+    print("  Creating Freightliner EV Analysis...")
     freightliner_data = create_freightliner_analysis_data()
     freightliner_df = pd.DataFrame(freightliner_data)
-    ev_pivot = pd.concat([ev_pivot, freightliner_df], ignore_index=True)
     
-    # Add spacing row
-    ev_pivot = pd.concat([ev_pivot, pd.DataFrame([spacing_row])], ignore_index=True)
-    
-    # Add Van EV Analysis
-    print("  Adding Van EV Analysis...")
+    print("  Creating Van EV Analysis...")
     van_data = create_van_ev_analysis_data()
     van_df = pd.DataFrame(van_data)
-    ev_pivot = pd.concat([ev_pivot, van_df], ignore_index=True)
     
-    # Add spacing row
-    ev_pivot = pd.concat([ev_pivot, pd.DataFrame([spacing_row])], ignore_index=True)
-    
-    # Add Car/SUV EV Analysis
-    print("  Adding Car/SUV EV Analysis...")
+    print("  Creating Car/SUV EV Analysis...")
     car_suv_data = create_car_suv_ev_analysis_data()
     car_suv_df = pd.DataFrame(car_suv_data)
-    ev_pivot = pd.concat([ev_pivot, car_suv_df], ignore_index=True)
     
-    # Add spacing row
-    ev_pivot = pd.concat([ev_pivot, pd.DataFrame([spacing_row])], ignore_index=True)
-    
-    # Add Pickup EV Analysis
-    print("  Adding Pickup EV Analysis...")
+    print("  Creating Pickup EV Analysis...")
     pickup_data = create_pickup_ev_analysis_data()
     pickup_df = pd.DataFrame(pickup_data)
-    ev_pivot = pd.concat([ev_pivot, pickup_df], ignore_index=True)
 
     with pd.ExcelWriter(output_path, engine='openpyxl') as writer:
-        # Main EV Summary sheet with all analyses combined
+        # Main EV Summary sheet (clean format without mixed columns)
         ev_pivot.to_excel(writer, sheet_name='EV_Summary', index=False)
+        
+        # Individual EV analyses in separate sheets (with their own format)
+        freightliner_df.to_excel(writer, sheet_name='Freightliner_EV', index=False)
+        van_df.to_excel(writer, sheet_name='Van_EV', index=False)
+        car_suv_df.to_excel(writer, sheet_name='Car_SUV_EV', index=False)
+        pickup_df.to_excel(writer, sheet_name='Pickup_EV', index=False)
         
         # Also create separate pivot tables for counts and costs
         count_data = []
@@ -291,39 +299,6 @@ def create_ev_assumption_pivot_table():
         pd.DataFrame(count_data).to_excel(writer, sheet_name='Vehicle_Counts', index=False)
         pd.DataFrame(cost_data).to_excel(writer, sheet_name='Replacement_Costs', index=False)
     
-    print(f"\nCOMPREHENSIVE EV_ASSUMPTION Analysis saved to: {output_path}")
-    print("Sheets created:")
-    print("  📊 EV_Summary (COMPLETE CONSOLIDATED ANALYSIS in one sheet)")
-    print("  📊 Vehicle_Counts (counts by vehicle class)")
-    print("  📊 Replacement_Costs (costs by vehicle class)")
-    print("\n✅ EV_SUMMARY SHEET - COMPLETE CONSOLIDATED STRUCTURE:")
-    print("  🔸 Main EV Summary (H, L, P vehicle classes)")
-    print("  🔸 Grand Total row")
-    print("  🔸 Radio Installation Expense row") 
-    print("  🔸 Total pre EV with Radio Installs row")
-    print("  🔸 5 new EV-related rows with CALCULATED VALUES:")
-    print("    • H -EV Purchases Net Impact to Capital Budget (= Freightliner EV Premium Impact)")
-    print("    • L - EV Purchased Net Impact to Capital Budget (= |Van| + |Car/SUV| + |Pickup| EV Impact)") 
-    print("    • Adjusted Budget to Reflect Avg EV Incremental (placeholder)")
-    print("    • 3_14 update (placeholder)")
-    print("    • Var (placeholder)")
-    print("  🔸 🚛 Freightliner EV Analysis (Heavy vehicle 6:1 EV ratio)")
-    print("  🔸 🚐 Van EV Analysis (Van 3:1 EV ratio - shows savings!)")
-    print("  🔸 🚗 Car/SUV EV Analysis (Car/SUV 3:1 EV ratio)")
-    print("  🔸 🛻 Pickup EV Analysis (Pickup 3:1 EV ratio)")
-    print("\n✅ CONSOLIDATED FEATURES:")
-    print("  - ALL analyses in ONE continuous EV_Summary sheet")
-    print("  - Multi-year calculations (2026-2035) for all sections")
-    print("  - Professional spacing between sections")
-    print("  - All cost values rounded for clean Excel presentation")
-    print("  - Chassis cost variables for easy maintenance")
-    print("  - Easy scrolling through complete EV capital plan")
-    
-    # Display summary
-    print("\n=== EV_ASSUMPTION Summary (2026-2030) ===")
-    print("Vehicle Class                | 2026 | 2027 | 2028 | 2029 | 2030")
-    print("-" * 90)
-    print("Format: Count/Cost (Radio Installation shows 0/RadioSpend)")
     
     for i, vehicle_class in enumerate(vehicle_classes + ['Grand Total', 'Radio Installation Expense', 'Total pre EV with Radio Installs']):
         row = f"{vehicle_class:<28}"
@@ -1171,35 +1146,35 @@ def create_freightliner_analysis_data():
         
         # Set specific values based on row type (using 2026 as reference year)
         if i == 1:  # H - 100% Freightliner ICE Vehicle per Budget
-            row_data['2026 Units'] = 1  # 1 unit for calculation
+            row_data['"2026\nUnits"'] = 1  # 1 unit for calculation
             row_data['Avg. Chassis Cost'] = ICE_CHASSIS_COST  # Use variable
             row_data['Notes'] = 'Per unit calculation'
         elif i == 2:  # H - $ TOTAL 100% Freightliner ICE Vehicle
-            row_data['2026 Units'] = ref_data['ice_vehicles_rounded']  # ICE vehicles
+            row_data['"2026\nUnits"'] = ref_data['ice_vehicles_rounded']  # ICE vehicles
             row_data['Avg. Chassis Cost'] = round(ref_data['ice_total_cost_actual'], 0)  # Round for Excel display
             row_data['Notes'] = f'H vehicles ({ref_data["h_vehicles_total"]}) less 6-1 EV ratio = {ref_data["ice_vehicles_actual"]:.2f}'
         elif i == 4:  # H - Avg Unit FRT EV Chassis
-            row_data['2026 Units'] = 1  # 1 unit for calculation
+            row_data['"2026\nUnits"'] = 1  # 1 unit for calculation
             row_data['Avg. Chassis Cost'] = EV_CHASSIS_COST  # Use variable
             row_data['Notes'] = 'Per EV unit calculation'
         elif i == 5:  # H - EV's needed based on 6 to 1 ratio
-            row_data['2026 Units'] = ref_data['ev_vehicles_needed_rounded']  # Rounded for display
+            row_data['"2026\nUnits"'] = ref_data['ev_vehicles_needed_rounded']  # Rounded for display
             row_data['Avg. Chassis Cost'] = round(ref_data['ev_needed_cost_actual'], 0)  # Round for Excel display
             row_data['Notes'] = f'ICE vehicles ({ref_data["ice_vehicles_actual"]:.2f}) / {FREIGHTLINER_EV_RATIO_TOTAL} = {ref_data["ev_vehicles_needed_actual"]:.2f}'
         elif i == 7:  # H - 100% Freightliner ICE Vehicles less 6-1 EV Vehicle Purchase Ratio
-            row_data['2026 Units'] = ref_data['ice_less_ev_rounded']  # Rounded for display
+            row_data['"2026\nUnits"'] = ref_data['ice_less_ev_rounded']  # Rounded for display
             row_data['Avg. Chassis Cost'] = round(ref_data['ice_less_ev_cost_actual'], 0)  # Round for Excel display
             row_data['Notes'] = f'ICE vehicles ({ref_data["ice_vehicles_actual"]:.2f}) - EV needed ({ref_data["ev_vehicles_needed_actual"]:.2f})'
         elif i == 9:  # Budget Total of 6-1 Ratio Scenario EVs and ICE
-            row_data['2026 Units'] = 0  # No units for total row
+            row_data['"2026\nUnits"'] = 0  # No units for total row
             row_data['Avg. Chassis Cost'] = round(ref_data['budget_total_cost_actual'], 0)  # Round for Excel display
             row_data['Notes'] = f'Total budget: ICE less EV (${ref_data["ice_less_ev_cost_actual"]:,.0f}) + EV needed (${ref_data["ev_needed_cost_actual"]:,.0f})'
         elif i == 10:  # EV Premium Impact to Budget
-            row_data['2026 Units'] = 0  # No units for impact row
+            row_data['"2026\nUnits"'] = 0  # No units for impact row
             row_data['Avg. Chassis Cost'] = round(ref_data['ev_premium_impact_actual'], 0)  # Round for Excel display
             row_data['Notes'] = f'Budget impact: Total (${ref_data["budget_total_cost_actual"]:,.0f}) - Original ICE (${ref_data["ice_total_cost_actual"]:,.0f})'
         else:
-            row_data['2026 Units'] = 0  # Placeholder for other rows
+            row_data['"2026\nUnits"'] = 0  # Placeholder for other rows
             row_data['Avg. Chassis Cost'] = 0
             row_data['Notes'] = ''
         
@@ -1209,29 +1184,29 @@ def create_freightliner_analysis_data():
             
             # Set vehicle counts and costs based on row type
             if i == 1:  # H - 100% Freightliner ICE Vehicle per Budget
-                row_data[f'{year} Vehicle Count'] = 1  # Always 1 unit
-                row_data[f'{year} Replacement Cost (Est.)'] = ICE_CHASSIS_COST  # Cost per unit
+                row_data[f'"{year}\nUnits"'] = 1  # Always 1 unit
+                row_data[f'{year}'] = ICE_CHASSIS_COST  # Cost per unit
             elif i == 2:  # H - $ TOTAL 100% Freightliner ICE Vehicle
-                row_data[f'{year} Vehicle Count'] = year_data['ice_vehicles_rounded']  # ICE vehicles count
-                row_data[f'{year} Replacement Cost (Est.)'] = round(year_data['ice_total_cost_actual'], 0)  # Round for Excel
+                row_data[f'"{year}\nUnits"'] = year_data['ice_vehicles_rounded']  # ICE vehicles count
+                row_data[f'{year}'] = round(year_data['ice_total_cost_actual'], 0)  # Round for Excel
             elif i == 4:  # H - Avg Unit FRT EV Chassis
-                row_data[f'{year} Vehicle Count'] = 1  # Always 1 unit
-                row_data[f'{year} Replacement Cost (Est.)'] = EV_CHASSIS_COST  # Cost per EV unit
+                row_data[f'"{year}\nUnits"'] = 1  # Always 1 unit
+                row_data[f'{year}'] = EV_CHASSIS_COST  # Cost per EV unit
             elif i == 5:  # H - EV's needed based on 6 to 1 ratio
-                row_data[f'{year} Vehicle Count'] = year_data['ev_vehicles_needed_rounded']  # EV count needed
-                row_data[f'{year} Replacement Cost (Est.)'] = round(year_data['ev_needed_cost_actual'], 0)  # Round for Excel
+                row_data[f'"{year}\nUnits"'] = year_data['ev_vehicles_needed_rounded']  # EV count needed
+                row_data[f'{year}'] = round(year_data['ev_needed_cost_actual'], 0)  # Round for Excel
             elif i == 7:  # H - 100% Freightliner ICE Vehicles less 6-1 EV Vehicle Purchase Ratio
-                row_data[f'{year} Vehicle Count'] = year_data['ice_less_ev_rounded']  # ICE remaining count
-                row_data[f'{year} Replacement Cost (Est.)'] = round(year_data['ice_less_ev_cost_actual'], 0)  # Round for Excel
+                row_data[f'"{year}\nUnits"'] = year_data['ice_less_ev_rounded']  # ICE remaining count
+                row_data[f'{year}'] = round(year_data['ice_less_ev_cost_actual'], 0)  # Round for Excel
             elif i == 9:  # Budget Total of 6-1 Ratio Scenario EVs and ICE
-                row_data[f'{year} Vehicle Count'] = 0  # No vehicle count for total row
-                row_data[f'{year} Replacement Cost (Est.)'] = round(year_data['budget_total_cost_actual'], 0)  # Round for Excel
+                row_data[f'"{year}\nUnits"'] = 0  # No vehicle count for total row
+                row_data[f'{year}'] = round(year_data['budget_total_cost_actual'], 0)  # Round for Excel
             elif i == 10:  # EV Premium Impact to Budget
-                row_data[f'{year} Vehicle Count'] = 0  # No vehicle count for impact row
-                row_data[f'{year} Replacement Cost (Est.)'] = round(year_data['ev_premium_impact_actual'], 0)  # Round for Excel
+                row_data[f'"{year}\nUnits"'] = 0  # No vehicle count for impact row
+                row_data[f'{year}'] = round(year_data['ev_premium_impact_actual'], 0)  # Round for Excel
             else:
-                row_data[f'{year} Vehicle Count'] = 0  # Placeholder for other rows
-                row_data[f'{year} Replacement Cost (Est.)'] = 0
+                row_data[f'"{year}\nUnits"'] = 0  # Placeholder for other rows
+                row_data[f'{year}'] = 0
         
         freightliner_data.append(row_data)
     
@@ -1343,35 +1318,35 @@ def create_freightliner_analysis():
         
         # Set specific values based on row type (using 2026 as reference year)
         if i == 1:  # H - 100% Freightliner ICE Vehicle per Budget
-            row_data['2026 Units'] = 1  # 1 unit for calculation
+            row_data['"2026\nUnits"'] = 1  # 1 unit for calculation
             row_data['Avg. Chassis Cost'] = ICE_CHASSIS_COST  # Use variable
             row_data['Notes'] = 'Per unit calculation'
         elif i == 2:  # H - $ TOTAL 100% Freightliner ICE Vehicle
-            row_data['2026 Units'] = ref_data['ice_vehicles_rounded']  # Rounded for display
+            row_data['"2026\nUnits"'] = ref_data['ice_vehicles_rounded']  # Rounded for display
             row_data['Avg. Chassis Cost'] = round(ref_data['ice_total_cost_actual'], 0)  # Round for Excel display
             row_data['Notes'] = f'Total H vehicles ({ref_data["h_vehicles_total"]}) minus EV portion (6:1 ratio)'
         elif i == 4:  # H - Avg Unit FRT EV Chassis
-            row_data['2026 Units'] = 1  # 1 unit for calculation
+            row_data['"2026\nUnits"'] = 1  # 1 unit for calculation
             row_data['Avg. Chassis Cost'] = EV_CHASSIS_COST  # Use variable
             row_data['Notes'] = 'Per EV unit calculation'
         elif i == 5:  # H - EV's needed based on 6 to 1 ratio
-            row_data['2026 Units'] = ref_data['ev_vehicles_needed_rounded']  # Rounded for display
+            row_data['"2026\nUnits"'] = ref_data['ev_vehicles_needed_rounded']  # Rounded for display
             row_data['Avg. Chassis Cost'] = round(ref_data['ev_needed_cost_actual'], 0)  # Round for Excel display
             row_data['Notes'] = f'ICE vehicles ({ref_data["ice_vehicles_actual"]:.4f}) divided by 7'
         elif i == 7:  # H - 100% Freightliner ICE Vehicles less 6-1 EV Vehicle Purchase Ratio
-            row_data['2026 Units'] = ref_data['ice_less_ev_rounded']  # Rounded for display
+            row_data['"2026\nUnits"'] = ref_data['ice_less_ev_rounded']  # Rounded for display
             row_data['Avg. Chassis Cost'] = round(ref_data['ice_less_ev_cost_actual'], 0)  # Round for Excel display
             row_data['Notes'] = f'ICE vehicles minus EV needed ({ref_data["ice_vehicles_actual"]:.4f} - {ref_data["ev_vehicles_needed_actual"]:.4f})'
         elif i == 9:  # Budget Total of 6-1 Ratio Scenario EVs and ICE
-            row_data['2026 Units'] = 0  # No units for total row
+            row_data['"2026\nUnits"'] = 0  # No units for total row
             row_data['Avg. Chassis Cost'] = round(ref_data['budget_total_cost_actual'], 0)  # Round for Excel display
             row_data['Notes'] = f'Total budget: ICE less EV (${ref_data["ice_less_ev_cost_actual"]:,.0f}) + EV needed (${ref_data["ev_needed_cost_actual"]:,.0f})'
         elif i == 10:  # EV Premium Impact to Budget
-            row_data['2026 Units'] = 0  # No units for impact row
+            row_data['"2026\nUnits"'] = 0  # No units for impact row
             row_data['Avg. Chassis Cost'] = round(ref_data['ev_premium_impact_actual'], 0)  # Round for Excel display
             row_data['Notes'] = f'Budget impact: Total (${ref_data["budget_total_cost_actual"]:,.0f}) - Original ICE (${ref_data["ice_total_cost_actual"]:,.0f})'
         else:
-            row_data['2026 Units'] = 0  # Placeholder for other rows
+            row_data['"2026\nUnits"'] = 0  # Placeholder for other rows
             row_data['Avg. Chassis Cost'] = 0
             row_data['Notes'] = ''
         
@@ -1381,29 +1356,29 @@ def create_freightliner_analysis():
             
             # Set vehicle counts and costs based on row type (round for Excel display)
             if i == 1:  # H - 100% Freightliner ICE Vehicle per Budget
-                row_data[f'{year} Vehicle Count'] = 1  # Always 1 unit
-                row_data[f'{year} Replacement Cost (Est.)'] = ICE_CHASSIS_COST  # Cost per unit
+                row_data[f'"{year}\nUnits"'] = 1  # Always 1 unit
+                row_data[f'{year}'] = ICE_CHASSIS_COST  # Cost per unit
             elif i == 2:  # H - $ TOTAL 100% Freightliner ICE Vehicle
-                row_data[f'{year} Vehicle Count'] = year_data['ice_vehicles_rounded']  # ICE vehicle count
-                row_data[f'{year} Replacement Cost (Est.)'] = round(year_data['ice_total_cost_actual'], 0)  # Round for Excel
+                row_data[f'"{year}\nUnits"'] = year_data['ice_vehicles_rounded']  # ICE vehicle count
+                row_data[f'{year}'] = round(year_data['ice_total_cost_actual'], 0)  # Round for Excel
             elif i == 4:  # H - Avg Unit FRT EV Chassis
-                row_data[f'{year} Vehicle Count'] = 1  # Always 1 unit
-                row_data[f'{year} Replacement Cost (Est.)'] = EV_CHASSIS_COST  # Cost per EV unit
+                row_data[f'"{year}\nUnits"'] = 1  # Always 1 unit
+                row_data[f'{year}'] = EV_CHASSIS_COST  # Cost per EV unit
             elif i == 5:  # H - EV's needed based on 6 to 1 ratio
-                row_data[f'{year} Vehicle Count'] = year_data['ev_vehicles_needed_rounded']  # EV count needed
-                row_data[f'{year} Replacement Cost (Est.)'] = round(year_data['ev_needed_cost_actual'], 0)  # Round for Excel
+                row_data[f'"{year}\nUnits"'] = year_data['ev_vehicles_needed_rounded']  # EV count needed
+                row_data[f'{year}'] = round(year_data['ev_needed_cost_actual'], 0)  # Round for Excel
             elif i == 7:  # H - 100% Freightliner ICE Vehicles less 6-1 EV Vehicle Purchase Ratio
-                row_data[f'{year} Vehicle Count'] = year_data['ice_less_ev_rounded']  # ICE less EV count
-                row_data[f'{year} Replacement Cost (Est.)'] = round(year_data['ice_less_ev_cost_actual'], 0)  # Round for Excel
+                row_data[f'"{year}\nUnits"'] = year_data['ice_less_ev_rounded']  # ICE less EV count
+                row_data[f'{year}'] = round(year_data['ice_less_ev_cost_actual'], 0)  # Round for Excel
             elif i == 9:  # Budget Total of 6-1 Ratio Scenario EVs and ICE
-                row_data[f'{year} Vehicle Count'] = 0  # No vehicle count for total row
-                row_data[f'{year} Replacement Cost (Est.)'] = round(year_data['budget_total_cost_actual'], 0)  # Round for Excel
+                row_data[f'"{year}\nUnits"'] = 0  # No vehicle count for total row
+                row_data[f'{year}'] = round(year_data['budget_total_cost_actual'], 0)  # Round for Excel
             elif i == 10:  # EV Premium Impact to Budget
-                row_data[f'{year} Vehicle Count'] = 0  # No vehicle count for impact row
-                row_data[f'{year} Replacement Cost (Est.)'] = round(year_data['ev_premium_impact_actual'], 0)  # Round for Excel
+                row_data[f'"{year}\nUnits"'] = 0  # No vehicle count for impact row
+                row_data[f'{year}'] = round(year_data['ev_premium_impact_actual'], 0)  # Round for Excel
             else:
-                row_data[f'{year} Vehicle Count'] = 0  # Placeholder for other rows
-                row_data[f'{year} Replacement Cost (Est.)'] = 0
+                row_data[f'"{year}\nUnits"'] = 0  # Placeholder for other rows
+                row_data[f'{year}'] = 0
         
         freightliner_data.append(row_data)
     
@@ -1571,35 +1546,35 @@ def create_van_ev_analysis_data():
         
         # Set specific values based on row type (using 2026 as reference year)
         if i == 1:  # L - 100% Van ICE Vehicle per Budget
-            row_data['2026 Units'] = 1  # 1 unit for calculation
+            row_data['"2026\nUnits"'] = 1  # 1 unit for calculation
             row_data['Avg. Chassis Cost'] = ICE_CHASSIS_COST_VAN  # Use variable
             row_data['Notes'] = 'Per unit calculation'
         elif i == 2:  # L - $ TOTAL 100% VAN ICE Vehicle
-            row_data['2026 Units'] = ref_data['l_van_vehicles_total']  # Total Van count
+            row_data['"2026\nUnits"'] = ref_data['l_van_vehicles_total']  # Total Van count
             row_data['Avg. Chassis Cost'] = round(ref_data['ice_total_cost_actual'], 0)  # Round for Excel display
             row_data['Notes'] = f'Total L Van vehicles ({ref_data["l_van_vehicles_total"]}) all ICE cost'
         elif i == 4:  # L - Avg Unit Van EV Chassis
-            row_data['2026 Units'] = 1  # 1 unit for calculation
+            row_data['"2026\nUnits"'] = 1  # 1 unit for calculation
             row_data['Avg. Chassis Cost'] = EV_CHASSIS_COST_VAN  # Use variable
             row_data['Notes'] = 'Per EV Van unit calculation'
         elif i == 5:  # L - EV's needed based on 3 to 1 ratio
-            row_data['2026 Units'] = ref_data['ev_vehicles_needed_rounded']  # Rounded for display
+            row_data['"2026\nUnits"'] = ref_data['ev_vehicles_needed_rounded']  # Rounded for display
             row_data['Avg. Chassis Cost'] = round(ref_data['ev_needed_cost_actual'], 0)  # Round for Excel display
             row_data['Notes'] = f'L Van vehicles ({ref_data["l_van_vehicles_total"]}) / {LIGHT_EV_RATIO_TOTAL} = {ref_data["ev_vehicles_needed_actual"]:.2f}'
         elif i == 7:  # L - 100% Van ICE Vehicles less 3-1 EV Vehicle Purchase Ratio
-            row_data['2026 Units'] = ref_data['ice_less_ev_rounded']  # Rounded for display
+            row_data['"2026\nUnits"'] = ref_data['ice_less_ev_rounded']  # Rounded for display
             row_data['Avg. Chassis Cost'] = round(ref_data['ice_less_ev_cost_actual'], 0)  # Round for Excel display
             row_data['Notes'] = f'L Van vehicles remaining as ICE after 3:1 ratio ({ref_data["ice_vehicles_actual"]:.2f})'
         elif i == 9:  # Budget Total of 3-1 Ratio Scenario EVs and ICE
-            row_data['2026 Units'] = 0  # No units for total row
+            row_data['"2026\nUnits"'] = 0  # No units for total row
             row_data['Avg. Chassis Cost'] = round(ref_data['budget_total_cost_actual'], 0)  # Round for Excel display
             row_data['Notes'] = f'Total budget: ICE remaining (${ref_data["ice_less_ev_cost_actual"]:,.0f}) + EV needed (${ref_data["ev_needed_cost_actual"]:,.0f})'
         elif i == 10:  # EV Premium Impact to Budget
-            row_data['2026 Units'] = 0  # No units for impact row
+            row_data['"2026\nUnits"'] = 0  # No units for impact row
             row_data['Avg. Chassis Cost'] = round(ref_data['ev_premium_impact_actual'], 0)  # Round for Excel display
             row_data['Notes'] = f'Budget impact: Total (${ref_data["budget_total_cost_actual"]:,.0f}) - Original ICE (${ref_data["ice_total_cost_actual"]:,.0f})'
         else:
-            row_data['2026 Units'] = 0  # Placeholder for other rows
+            row_data['"2026\nUnits"'] = 0  # Placeholder for other rows
             row_data['Avg. Chassis Cost'] = 0
             row_data['Notes'] = ''
         
@@ -1609,29 +1584,29 @@ def create_van_ev_analysis_data():
             
             # Set vehicle counts and costs based on row type
             if i == 1:  # L - 100% Van ICE Vehicle per Budget
-                row_data[f'{year} Vehicle Count'] = 1  # Always 1 unit
-                row_data[f'{year} Replacement Cost (Est.)'] = ICE_CHASSIS_COST_VAN  # Cost per unit
+                row_data[f'"{year}\nUnits"'] = 1  # Always 1 unit
+                row_data[f'{year}'] = ICE_CHASSIS_COST_VAN  # Cost per unit
             elif i == 2:  # L - $ TOTAL 100% VAN ICE Vehicle
-                row_data[f'{year} Vehicle Count'] = year_data['l_van_vehicles_total']  # Total Van count
-                row_data[f'{year} Replacement Cost (Est.)'] = round(year_data['ice_total_cost_actual'], 0)  # Round for Excel
+                row_data[f'"{year}\nUnits"'] = year_data['l_van_vehicles_total']  # Total Van count
+                row_data[f'{year}'] = round(year_data['ice_total_cost_actual'], 0)  # Round for Excel
             elif i == 4:  # L - Avg Unit Van EV Chassis
-                row_data[f'{year} Vehicle Count'] = 1  # Always 1 unit
-                row_data[f'{year} Replacement Cost (Est.)'] = EV_CHASSIS_COST_VAN  # Cost per EV unit
+                row_data[f'"{year}\nUnits"'] = 1  # Always 1 unit
+                row_data[f'{year}'] = EV_CHASSIS_COST_VAN  # Cost per EV unit
             elif i == 5:  # L - EV's needed based on 3 to 1 ratio
-                row_data[f'{year} Vehicle Count'] = year_data['ev_vehicles_needed_rounded']  # EV count needed
-                row_data[f'{year} Replacement Cost (Est.)'] = round(year_data['ev_needed_cost_actual'], 0)  # Round for Excel
+                row_data[f'"{year}\nUnits"'] = year_data['ev_vehicles_needed_rounded']  # EV count needed
+                row_data[f'{year}'] = round(year_data['ev_needed_cost_actual'], 0)  # Round for Excel
             elif i == 7:  # L - 100% Van ICE Vehicles less 3-1 EV Vehicle Purchase Ratio
-                row_data[f'{year} Vehicle Count'] = year_data['ice_less_ev_rounded']  # ICE remaining count
-                row_data[f'{year} Replacement Cost (Est.)'] = round(year_data['ice_less_ev_cost_actual'], 0)  # Round for Excel
+                row_data[f'"{year}\nUnits"'] = year_data['ice_less_ev_rounded']  # ICE remaining count
+                row_data[f'{year}'] = round(year_data['ice_less_ev_cost_actual'], 0)  # Round for Excel
             elif i == 9:  # Budget Total of 3-1 Ratio Scenario EVs and ICE
-                row_data[f'{year} Vehicle Count'] = 0  # No vehicle count for total row
-                row_data[f'{year} Replacement Cost (Est.)'] = round(year_data['budget_total_cost_actual'], 0)  # Round for Excel
+                row_data[f'"{year}\nUnits"'] = 0  # No vehicle count for total row
+                row_data[f'{year}'] = round(year_data['budget_total_cost_actual'], 0)  # Round for Excel
             elif i == 10:  # EV Premium Impact to Budget
-                row_data[f'{year} Vehicle Count'] = 0  # No vehicle count for impact row
-                row_data[f'{year} Replacement Cost (Est.)'] = round(year_data['ev_premium_impact_actual'], 0)  # Round for Excel
+                row_data[f'"{year}\nUnits"'] = 0  # No vehicle count for impact row
+                row_data[f'{year}'] = round(year_data['ev_premium_impact_actual'], 0)  # Round for Excel
             else:
-                row_data[f'{year} Vehicle Count'] = 0  # Placeholder for other rows
-                row_data[f'{year} Replacement Cost (Est.)'] = 0
+                row_data[f'"{year}\nUnits"'] = 0  # Placeholder for other rows
+                row_data[f'{year}'] = 0
         
         van_data.append(row_data)
     
@@ -1741,35 +1716,35 @@ def create_van_ev_analysis():
         
         # Set specific values based on row type (using 2026 as reference year)
         if i == 1:  # L - 100% Van ICE Vehicle per Budget
-            row_data['2026 Units'] = 1  # 1 unit for calculation
+            row_data['"2026\nUnits"'] = 1  # 1 unit for calculation
             row_data['Avg. Chassis Cost'] = ICE_CHASSIS_COST_VAN  # Use variable
             row_data['Notes'] = 'Per unit calculation'
         elif i == 2:  # L - $ TOTAL 100% VAN ICE Vehicle
-            row_data['2026 Units'] = ref_data['l_van_vehicles_total']  # Total Van count
+            row_data['"2026\nUnits"'] = ref_data['l_van_vehicles_total']  # Total Van count
             row_data['Avg. Chassis Cost'] = round(ref_data['ice_total_cost_actual'], 0)  # Round for Excel display
             row_data['Notes'] = f'Total L Van vehicles ({ref_data["l_van_vehicles_total"]}) all ICE cost'
         elif i == 4:  # L - Avg Unit Van EV Chassis
-            row_data['2026 Units'] = 1  # 1 unit for calculation
+            row_data['"2026\nUnits"'] = 1  # 1 unit for calculation
             row_data['Avg. Chassis Cost'] = EV_CHASSIS_COST_VAN  # Use variable
             row_data['Notes'] = 'Per EV Van unit calculation'
         elif i == 5:  # L - EV's needed based on 3 to 1 ratio
-            row_data['2026 Units'] = ref_data['ev_vehicles_needed_rounded']  # Rounded for display
+            row_data['"2026\nUnits"'] = ref_data['ev_vehicles_needed_rounded']  # Rounded for display
             row_data['Avg. Chassis Cost'] = round(ref_data['ev_needed_cost_actual'], 0)  # Round for Excel display
             row_data['Notes'] = f'L Van vehicles ({ref_data["l_van_vehicles_total"]}) / {LIGHT_EV_RATIO_TOTAL} = {ref_data["ev_vehicles_needed_actual"]:.2f}'
         elif i == 7:  # L - 100% Van ICE Vehicles less 3-1 EV Vehicle Purchase Ratio
-            row_data['2026 Units'] = ref_data['ice_less_ev_rounded']  # Rounded for display
+            row_data['"2026\nUnits"'] = ref_data['ice_less_ev_rounded']  # Rounded for display
             row_data['Avg. Chassis Cost'] = round(ref_data['ice_less_ev_cost_actual'], 0)  # Round for Excel display
             row_data['Notes'] = f'L Van vehicles remaining as ICE after 3:1 ratio ({ref_data["ice_vehicles_actual"]:.2f})'
         elif i == 9:  # Budget Total of 3-1 Ratio Scenario EVs and ICE
-            row_data['2026 Units'] = 0  # No units for total row
+            row_data['"2026\nUnits"'] = 0  # No units for total row
             row_data['Avg. Chassis Cost'] = round(ref_data['budget_total_cost_actual'], 0)  # Round for Excel display
             row_data['Notes'] = f'Total budget: ICE remaining (${ref_data["ice_less_ev_cost_actual"]:,.0f}) + EV needed (${ref_data["ev_needed_cost_actual"]:,.0f})'
         elif i == 10:  # EV Premium Impact to Budget
-            row_data['2026 Units'] = 0  # No units for impact row
+            row_data['"2026\nUnits"'] = 0  # No units for impact row
             row_data['Avg. Chassis Cost'] = round(ref_data['ev_premium_impact_actual'], 0)  # Round for Excel display
             row_data['Notes'] = f'Budget impact: Total (${ref_data["budget_total_cost_actual"]:,.0f}) - Original ICE (${ref_data["ice_total_cost_actual"]:,.0f})'
         else:
-            row_data['2026 Units'] = 0  # Placeholder for other rows
+            row_data['"2026\nUnits"'] = 0  # Placeholder for other rows
             row_data['Avg. Chassis Cost'] = 0
             row_data['Notes'] = ''
         
@@ -1779,29 +1754,29 @@ def create_van_ev_analysis():
             
             # Set vehicle counts and costs based on row type
             if i == 1:  # L - 100% Van ICE Vehicle per Budget
-                row_data[f'{year} Vehicle Count'] = 1  # Always 1 unit
-                row_data[f'{year} Replacement Cost (Est.)'] = ICE_CHASSIS_COST_VAN  # Cost per unit
+                row_data[f'"{year}\nUnits"'] = 1  # Always 1 unit
+                row_data[f'{year}'] = ICE_CHASSIS_COST_VAN  # Cost per unit
             elif i == 2:  # L - $ TOTAL 100% VAN ICE Vehicle
-                row_data[f'{year} Vehicle Count'] = year_data['l_van_vehicles_total']  # Total Van count
-                row_data[f'{year} Replacement Cost (Est.)'] = round(year_data['ice_total_cost_actual'], 0)  # Round for Excel
+                row_data[f'"{year}\nUnits"'] = year_data['l_van_vehicles_total']  # Total Van count
+                row_data[f'{year}'] = round(year_data['ice_total_cost_actual'], 0)  # Round for Excel
             elif i == 4:  # L - Avg Unit Van EV Chassis
-                row_data[f'{year} Vehicle Count'] = 1  # Always 1 unit
-                row_data[f'{year} Replacement Cost (Est.)'] = EV_CHASSIS_COST_VAN  # Cost per EV unit
+                row_data[f'"{year}\nUnits"'] = 1  # Always 1 unit
+                row_data[f'{year}'] = EV_CHASSIS_COST_VAN  # Cost per EV unit
             elif i == 5:  # L - EV's needed based on 3 to 1 ratio
-                row_data[f'{year} Vehicle Count'] = year_data['ev_vehicles_needed_rounded']  # EV count needed
-                row_data[f'{year} Replacement Cost (Est.)'] = round(year_data['ev_needed_cost_actual'], 0)  # Round for Excel
+                row_data[f'"{year}\nUnits"'] = year_data['ev_vehicles_needed_rounded']  # EV count needed
+                row_data[f'{year}'] = round(year_data['ev_needed_cost_actual'], 0)  # Round for Excel
             elif i == 7:  # L - 100% Van ICE Vehicles less 3-1 EV Vehicle Purchase Ratio
-                row_data[f'{year} Vehicle Count'] = year_data['ice_less_ev_rounded']  # ICE remaining count
-                row_data[f'{year} Replacement Cost (Est.)'] = round(year_data['ice_less_ev_cost_actual'], 0)  # Round for Excel
+                row_data[f'"{year}\nUnits"'] = year_data['ice_less_ev_rounded']  # ICE remaining count
+                row_data[f'{year}'] = round(year_data['ice_less_ev_cost_actual'], 0)  # Round for Excel
             elif i == 9:  # Budget Total of 3-1 Ratio Scenario EVs and ICE
-                row_data[f'{year} Vehicle Count'] = 0  # No vehicle count for total row
-                row_data[f'{year} Replacement Cost (Est.)'] = round(year_data['budget_total_cost_actual'], 0)  # Round for Excel
+                row_data[f'"{year}\nUnits"'] = 0  # No vehicle count for total row
+                row_data[f'{year}'] = round(year_data['budget_total_cost_actual'], 0)  # Round for Excel
             elif i == 10:  # EV Premium Impact to Budget
-                row_data[f'{year} Vehicle Count'] = 0  # No vehicle count for impact row
-                row_data[f'{year} Replacement Cost (Est.)'] = round(year_data['ev_premium_impact_actual'], 0)  # Round for Excel
+                row_data[f'"{year}\nUnits"'] = 0  # No vehicle count for impact row
+                row_data[f'{year}'] = round(year_data['ev_premium_impact_actual'], 0)  # Round for Excel
             else:
-                row_data[f'{year} Vehicle Count'] = 0  # Placeholder for other rows
-                row_data[f'{year} Replacement Cost (Est.)'] = 0
+                row_data[f'"{year}\nUnits"'] = 0  # Placeholder for other rows
+                row_data[f'{year}'] = 0
         
         van_data.append(row_data)
     
@@ -1952,35 +1927,35 @@ def create_car_suv_ev_analysis_data():
         
         # Set specific values based on row type (using 2026 as reference year)
         if i == 1:  # L - 100% Car / SUV ICE Vehicle per Budget
-            row_data['2026 Units'] = 1  # 1 unit for calculation
+            row_data['"2026\nUnits"'] = 1  # 1 unit for calculation
             row_data['Avg. Chassis Cost'] = ICE_CHASSIS_COST_CAR  # Use variable
             row_data['Notes'] = 'Per unit calculation'
         elif i == 2:  # L - $ TOTAL 100% Car / SUV ICE Vehicle
-            row_data['2026 Units'] = ref_data['l_car_suv_vehicles_total']  # Total Car/SUV count
+            row_data['"2026\nUnits"'] = ref_data['l_car_suv_vehicles_total']  # Total Car/SUV count
             row_data['Avg. Chassis Cost'] = round(ref_data['ice_total_cost_actual'], 0)  # Round for Excel display
             row_data['Notes'] = f'Total L Car/SUV vehicles ({ref_data["l_car_suv_vehicles_total"]}) all ICE cost'
         elif i == 4:  # L - Avg Unit Car / SUV EV Chassis
-            row_data['2026 Units'] = 1  # 1 unit for calculation
+            row_data['"2026\nUnits"'] = 1  # 1 unit for calculation
             row_data['Avg. Chassis Cost'] = EV_CHASSIS_COST_CAR  # Use variable
             row_data['Notes'] = 'Per EV Car/SUV unit calculation'
         elif i == 5:  # L - EV's needed based on 3 to 1 ratio
-            row_data['2026 Units'] = ref_data['ev_vehicles_needed_rounded']  # Rounded for display
+            row_data['"2026\nUnits"'] = ref_data['ev_vehicles_needed_rounded']  # Rounded for display
             row_data['Avg. Chassis Cost'] = round(ref_data['ev_needed_cost_actual'], 0)  # Round for Excel display
             row_data['Notes'] = f'L Car/SUV vehicles ({ref_data["l_car_suv_vehicles_total"]}) / {LIGHT_EV_RATIO_TOTAL} = {ref_data["ev_vehicles_needed_actual"]:.2f}'
         elif i == 7:  # L - 100% Car / SUV ICE Vehicles less 3-1 EV Vehicle Purchase Ratio
-            row_data['2026 Units'] = ref_data['ice_less_ev_rounded']  # Rounded for display
+            row_data['"2026\nUnits"'] = ref_data['ice_less_ev_rounded']  # Rounded for display
             row_data['Avg. Chassis Cost'] = round(ref_data['ice_less_ev_cost_actual'], 0)  # Round for Excel display
             row_data['Notes'] = f'L Car/SUV vehicles remaining as ICE after 3:1 ratio ({ref_data["ice_vehicles_actual"]:.2f})'
         elif i == 9:  # Budget Total of 3-1 Ratio Scenario EVs and ICE
-            row_data['2026 Units'] = 0  # No units for total row
+            row_data['"2026\nUnits"'] = 0  # No units for total row
             row_data['Avg. Chassis Cost'] = round(ref_data['budget_total_cost_actual'], 0)  # Round for Excel display
             row_data['Notes'] = f'Total budget: ICE remaining (${ref_data["ice_less_ev_cost_actual"]:,.0f}) + EV needed (${ref_data["ev_needed_cost_actual"]:,.0f})'
         elif i == 10:  # EV Premium Impact to Budget
-            row_data['2026 Units'] = 0  # No units for impact row
+            row_data['"2026\nUnits"'] = 0  # No units for impact row
             row_data['Avg. Chassis Cost'] = round(ref_data['ev_premium_impact_actual'], 0)  # Round for Excel display
             row_data['Notes'] = f'Budget impact: Total (${ref_data["budget_total_cost_actual"]:,.0f}) - Original ICE (${ref_data["ice_total_cost_actual"]:,.0f})'
         else:
-            row_data['2026 Units'] = 0  # Placeholder for other rows
+            row_data['"2026\nUnits"'] = 0  # Placeholder for other rows
             row_data['Avg. Chassis Cost'] = 0
             row_data['Notes'] = ''
         
@@ -1990,29 +1965,29 @@ def create_car_suv_ev_analysis_data():
             
             # Set vehicle counts and costs based on row type
             if i == 1:  # L - 100% Car / SUV ICE Vehicle per Budget
-                row_data[f'{year} Vehicle Count'] = 1  # Always 1 unit
-                row_data[f'{year} Replacement Cost (Est.)'] = ICE_CHASSIS_COST_CAR  # Cost per unit
+                row_data[f'"{year}\nUnits"'] = 1  # Always 1 unit
+                row_data[f'{year}'] = ICE_CHASSIS_COST_CAR  # Cost per unit
             elif i == 2:  # L - $ TOTAL 100% Car / SUV ICE Vehicle
-                row_data[f'{year} Vehicle Count'] = year_data['l_car_suv_vehicles_total']  # Total Car/SUV count
-                row_data[f'{year} Replacement Cost (Est.)'] = round(year_data['ice_total_cost_actual'], 0)  # Round for Excel
+                row_data[f'"{year}\nUnits"'] = year_data['l_car_suv_vehicles_total']  # Total Car/SUV count
+                row_data[f'{year}'] = round(year_data['ice_total_cost_actual'], 0)  # Round for Excel
             elif i == 4:  # L - Avg Unit Car / SUV EV Chassis
-                row_data[f'{year} Vehicle Count'] = 1  # Always 1 unit
-                row_data[f'{year} Replacement Cost (Est.)'] = EV_CHASSIS_COST_CAR  # Cost per EV unit
+                row_data[f'"{year}\nUnits"'] = 1  # Always 1 unit
+                row_data[f'{year}'] = EV_CHASSIS_COST_CAR  # Cost per EV unit
             elif i == 5:  # L - EV's needed based on 3 to 1 ratio
-                row_data[f'{year} Vehicle Count'] = year_data['ev_vehicles_needed_rounded']  # EV count needed
-                row_data[f'{year} Replacement Cost (Est.)'] = round(year_data['ev_needed_cost_actual'], 0)  # Round for Excel
+                row_data[f'"{year}\nUnits"'] = year_data['ev_vehicles_needed_rounded']  # EV count needed
+                row_data[f'{year}'] = round(year_data['ev_needed_cost_actual'], 0)  # Round for Excel
             elif i == 7:  # L - 100% Car / SUV ICE Vehicles less 3-1 EV Vehicle Purchase Ratio
-                row_data[f'{year} Vehicle Count'] = year_data['ice_less_ev_rounded']  # ICE remaining count
-                row_data[f'{year} Replacement Cost (Est.)'] = round(year_data['ice_less_ev_cost_actual'], 0)  # Round for Excel
+                row_data[f'"{year}\nUnits"'] = year_data['ice_less_ev_rounded']  # ICE remaining count
+                row_data[f'{year}'] = round(year_data['ice_less_ev_cost_actual'], 0)  # Round for Excel
             elif i == 9:  # Budget Total of 3-1 Ratio Scenario EVs and ICE
-                row_data[f'{year} Vehicle Count'] = 0  # No vehicle count for total row
-                row_data[f'{year} Replacement Cost (Est.)'] = round(year_data['budget_total_cost_actual'], 0)  # Round for Excel
+                row_data[f'"{year}\nUnits"'] = 0  # No vehicle count for total row
+                row_data[f'{year}'] = round(year_data['budget_total_cost_actual'], 0)  # Round for Excel
             elif i == 10:  # EV Premium Impact to Budget
-                row_data[f'{year} Vehicle Count'] = 0  # No vehicle count for impact row
-                row_data[f'{year} Replacement Cost (Est.)'] = round(year_data['ev_premium_impact_actual'], 0)  # Round for Excel
+                row_data[f'"{year}\nUnits"'] = 0  # No vehicle count for impact row
+                row_data[f'{year}'] = round(year_data['ev_premium_impact_actual'], 0)  # Round for Excel
             else:
-                row_data[f'{year} Vehicle Count'] = 0  # Placeholder for other rows
-                row_data[f'{year} Replacement Cost (Est.)'] = 0
+                row_data[f'"{year}\nUnits"'] = 0  # Placeholder for other rows
+                row_data[f'{year}'] = 0
         
         car_suv_data.append(row_data)
     
@@ -2122,35 +2097,35 @@ def create_car_suv_ev_analysis():
         
         # Set specific values based on row type (using 2026 as reference year)
         if i == 1:  # L - 100% Car / SUV ICE Vehicle per Budget
-            row_data['2026 Units'] = 1  # 1 unit for calculation
+            row_data['"2026\nUnits"'] = 1  # 1 unit for calculation
             row_data['Avg. Chassis Cost'] = ICE_CHASSIS_COST_CAR  # Use variable
             row_data['Notes'] = 'Per unit calculation'
         elif i == 2:  # L - $ TOTAL 100% Car / SUV ICE Vehicle
-            row_data['2026 Units'] = ref_data['l_car_suv_vehicles_total']  # Total Car/SUV count
+            row_data['"2026\nUnits"'] = ref_data['l_car_suv_vehicles_total']  # Total Car/SUV count
             row_data['Avg. Chassis Cost'] = round(ref_data['ice_total_cost_actual'], 0)  # Round for Excel display
             row_data['Notes'] = f'Total L Car/SUV vehicles ({ref_data["l_car_suv_vehicles_total"]}) all ICE cost'
         elif i == 4:  # L - Avg Unit Car / SUV EV Chassis
-            row_data['2026 Units'] = 1  # 1 unit for calculation
+            row_data['"2026\nUnits"'] = 1  # 1 unit for calculation
             row_data['Avg. Chassis Cost'] = EV_CHASSIS_COST_CAR  # Use variable
             row_data['Notes'] = 'Per EV Car/SUV unit calculation'
         elif i == 5:  # L - EV's needed based on 3 to 1 ratio
-            row_data['2026 Units'] = ref_data['ev_vehicles_needed_rounded']  # Rounded for display
+            row_data['"2026\nUnits"'] = ref_data['ev_vehicles_needed_rounded']  # Rounded for display
             row_data['Avg. Chassis Cost'] = round(ref_data['ev_needed_cost_actual'], 0)  # Round for Excel display
             row_data['Notes'] = f'L Car/SUV vehicles ({ref_data["l_car_suv_vehicles_total"]}) / {LIGHT_EV_RATIO_TOTAL} = {ref_data["ev_vehicles_needed_actual"]:.2f}'
         elif i == 7:  # L - 100% Car / SUV ICE Vehicles less 3-1 EV Vehicle Purchase Ratio
-            row_data['2026 Units'] = ref_data['ice_less_ev_rounded']  # Rounded for display
+            row_data['"2026\nUnits"'] = ref_data['ice_less_ev_rounded']  # Rounded for display
             row_data['Avg. Chassis Cost'] = round(ref_data['ice_less_ev_cost_actual'], 0)  # Round for Excel display
             row_data['Notes'] = f'L Car/SUV vehicles remaining as ICE after 3:1 ratio ({ref_data["ice_vehicles_actual"]:.2f})'
         elif i == 9:  # Budget Total of 3-1 Ratio Scenario EVs and ICE
-            row_data['2026 Units'] = 0  # No units for total row
+            row_data['"2026\nUnits"'] = 0  # No units for total row
             row_data['Avg. Chassis Cost'] = round(ref_data['budget_total_cost_actual'], 0)  # Round for Excel display
             row_data['Notes'] = f'Total budget: ICE remaining (${ref_data["ice_less_ev_cost_actual"]:,.0f}) + EV needed (${ref_data["ev_needed_cost_actual"]:,.0f})'
         elif i == 10:  # EV Premium Impact to Budget
-            row_data['2026 Units'] = 0  # No units for impact row
+            row_data['"2026\nUnits"'] = 0  # No units for impact row
             row_data['Avg. Chassis Cost'] = round(ref_data['ev_premium_impact_actual'], 0)  # Round for Excel display
             row_data['Notes'] = f'Budget impact: Total (${ref_data["budget_total_cost_actual"]:,.0f}) - Original ICE (${ref_data["ice_total_cost_actual"]:,.0f})'
         else:
-            row_data['2026 Units'] = 0  # Placeholder for other rows
+            row_data['"2026\nUnits"'] = 0  # Placeholder for other rows
             row_data['Avg. Chassis Cost'] = 0
             row_data['Notes'] = ''
         
@@ -2160,29 +2135,29 @@ def create_car_suv_ev_analysis():
             
             # Set vehicle counts and costs based on row type
             if i == 1:  # L - 100% Car / SUV ICE Vehicle per Budget
-                row_data[f'{year} Vehicle Count'] = 1  # Always 1 unit
-                row_data[f'{year} Replacement Cost (Est.)'] = ICE_CHASSIS_COST_CAR  # Cost per unit
+                row_data[f'"{year}\nUnits"'] = 1  # Always 1 unit
+                row_data[f'{year}'] = ICE_CHASSIS_COST_CAR  # Cost per unit
             elif i == 2:  # L - $ TOTAL 100% Car / SUV ICE Vehicle
-                row_data[f'{year} Vehicle Count'] = year_data['l_car_suv_vehicles_total']  # Total Car/SUV count
-                row_data[f'{year} Replacement Cost (Est.)'] = round(year_data['ice_total_cost_actual'], 0)  # Round for Excel
+                row_data[f'"{year}\nUnits"'] = year_data['l_car_suv_vehicles_total']  # Total Car/SUV count
+                row_data[f'{year}'] = round(year_data['ice_total_cost_actual'], 0)  # Round for Excel
             elif i == 4:  # L - Avg Unit Car / SUV EV Chassis
-                row_data[f'{year} Vehicle Count'] = 1  # Always 1 unit
-                row_data[f'{year} Replacement Cost (Est.)'] = EV_CHASSIS_COST_CAR  # Cost per EV unit
+                row_data[f'"{year}\nUnits"'] = 1  # Always 1 unit
+                row_data[f'{year}'] = EV_CHASSIS_COST_CAR  # Cost per EV unit
             elif i == 5:  # L - EV's needed based on 3 to 1 ratio
-                row_data[f'{year} Vehicle Count'] = year_data['ev_vehicles_needed_rounded']  # EV count needed
-                row_data[f'{year} Replacement Cost (Est.)'] = round(year_data['ev_needed_cost_actual'], 0)  # Round for Excel
+                row_data[f'"{year}\nUnits"'] = year_data['ev_vehicles_needed_rounded']  # EV count needed
+                row_data[f'{year}'] = round(year_data['ev_needed_cost_actual'], 0)  # Round for Excel
             elif i == 7:  # L - 100% Car / SUV ICE Vehicles less 3-1 EV Vehicle Purchase Ratio
-                row_data[f'{year} Vehicle Count'] = year_data['ice_less_ev_rounded']  # ICE remaining count
-                row_data[f'{year} Replacement Cost (Est.)'] = round(year_data['ice_less_ev_cost_actual'], 0)  # Round for Excel
+                row_data[f'"{year}\nUnits"'] = year_data['ice_less_ev_rounded']  # ICE remaining count
+                row_data[f'{year}'] = round(year_data['ice_less_ev_cost_actual'], 0)  # Round for Excel
             elif i == 9:  # Budget Total of 3-1 Ratio Scenario EVs and ICE
-                row_data[f'{year} Vehicle Count'] = 0  # No vehicle count for total row
-                row_data[f'{year} Replacement Cost (Est.)'] = round(year_data['budget_total_cost_actual'], 0)  # Round for Excel
+                row_data[f'"{year}\nUnits"'] = 0  # No vehicle count for total row
+                row_data[f'{year}'] = round(year_data['budget_total_cost_actual'], 0)  # Round for Excel
             elif i == 10:  # EV Premium Impact to Budget
-                row_data[f'{year} Vehicle Count'] = 0  # No vehicle count for impact row
-                row_data[f'{year} Replacement Cost (Est.)'] = round(year_data['ev_premium_impact_actual'], 0)  # Round for Excel
+                row_data[f'"{year}\nUnits"'] = 0  # No vehicle count for impact row
+                row_data[f'{year}'] = round(year_data['ev_premium_impact_actual'], 0)  # Round for Excel
             else:
-                row_data[f'{year} Vehicle Count'] = 0  # Placeholder for other rows
-                row_data[f'{year} Replacement Cost (Est.)'] = 0
+                row_data[f'"{year}\nUnits"'] = 0  # Placeholder for other rows
+                row_data[f'{year}'] = 0
         
         car_suv_data.append(row_data)
     
@@ -2333,35 +2308,35 @@ def create_pickup_ev_analysis_data():
         
         # Set specific values based on row type (using 2026 as reference year)
         if i == 1:  # L - 100% Pick Up ICE Vehicle per Budget
-            row_data['2026 Units'] = 1  # 1 unit for calculation
+            row_data['"2026\nUnits"'] = 1  # 1 unit for calculation
             row_data['Avg. Chassis Cost'] = ICE_CHASSIS_COST_PICKUP  # Use variable
             row_data['Notes'] = 'Per unit calculation'
         elif i == 2:  # L - $ TOTAL 100% Pick Up ICE Vehicle ****
-            row_data['2026 Units'] = ref_data['l_pickup_vehicles_total']  # Total Pickup count
+            row_data['"2026\nUnits"'] = ref_data['l_pickup_vehicles_total']  # Total Pickup count
             row_data['Avg. Chassis Cost'] = round(ref_data['ice_total_cost_actual'], 0)  # Round for Excel display
             row_data['Notes'] = f'Total L Pickup vehicles ({ref_data["l_pickup_vehicles_total"]}) all ICE cost'
         elif i == 4:  # L - Avg Unit Pick Up EV Chassis
-            row_data['2026 Units'] = 1  # 1 unit for calculation
+            row_data['"2026\nUnits"'] = 1  # 1 unit for calculation
             row_data['Avg. Chassis Cost'] = EV_CHASSIS_COST_PICKUP  # Use variable
             row_data['Notes'] = 'Per EV Pickup unit calculation'
         elif i == 5:  # L - EV's needed based on 3 to 1 ratio
-            row_data['2026 Units'] = ref_data['ev_vehicles_needed_rounded']  # Rounded for display
+            row_data['"2026\nUnits"'] = ref_data['ev_vehicles_needed_rounded']  # Rounded for display
             row_data['Avg. Chassis Cost'] = round(ref_data['ev_needed_cost_actual'], 0)  # Round for Excel display
             row_data['Notes'] = f'L Pickup vehicles ({ref_data["l_pickup_vehicles_total"]}) / {LIGHT_EV_RATIO_TOTAL} = {ref_data["ev_vehicles_needed_actual"]:.2f}'
         elif i == 7:  # L - 100% Pick Up ICE Vehicles less 3-1 EV Vehicle Purchase Ratio
-            row_data['2026 Units'] = ref_data['ice_less_ev_rounded']  # Rounded for display
+            row_data['"2026\nUnits"'] = ref_data['ice_less_ev_rounded']  # Rounded for display
             row_data['Avg. Chassis Cost'] = round(ref_data['ice_less_ev_cost_actual'], 0)  # Round for Excel display
             row_data['Notes'] = f'L Pickup vehicles remaining as ICE after 3:1 ratio ({ref_data["ice_vehicles_actual"]:.2f})'
         elif i == 9:  # Budget Total of 3-1 Ratio Scenario EVs and ICE
-            row_data['2026 Units'] = 0  # No units for total row
+            row_data['"2026\nUnits"'] = 0  # No units for total row
             row_data['Avg. Chassis Cost'] = round(ref_data['budget_total_cost_actual'], 0)  # Round for Excel display
             row_data['Notes'] = f'Total budget: ICE remaining (${ref_data["ice_less_ev_cost_actual"]:,.0f}) + EV needed (${ref_data["ev_needed_cost_actual"]:,.0f})'
         elif i == 10:  # EV Premium Impact to Budget
-            row_data['2026 Units'] = 0  # No units for impact row
+            row_data['"2026\nUnits"'] = 0  # No units for impact row
             row_data['Avg. Chassis Cost'] = round(ref_data['ev_premium_impact_actual'], 0)  # Round for Excel display
             row_data['Notes'] = f'Budget impact: Total (${ref_data["budget_total_cost_actual"]:,.0f}) - Original ICE (${ref_data["ice_total_cost_actual"]:,.0f})'
         else:
-            row_data['2026 Units'] = 0  # Placeholder for other rows
+            row_data['"2026\nUnits"'] = 0  # Placeholder for other rows
             row_data['Avg. Chassis Cost'] = 0
             row_data['Notes'] = ''
         
@@ -2371,29 +2346,29 @@ def create_pickup_ev_analysis_data():
             
             # Set vehicle counts and costs based on row type
             if i == 1:  # L - 100% Pick Up ICE Vehicle per Budget
-                row_data[f'{year} Vehicle Count'] = 1  # Always 1 unit
-                row_data[f'{year} Replacement Cost (Est.)'] = ICE_CHASSIS_COST_PICKUP  # Cost per unit
+                row_data[f'"{year}\nUnits"'] = 1  # Always 1 unit
+                row_data[f'{year}'] = ICE_CHASSIS_COST_PICKUP  # Cost per unit
             elif i == 2:  # L - $ TOTAL 100% Pick Up ICE Vehicle ****
-                row_data[f'{year} Vehicle Count'] = year_data['l_pickup_vehicles_total']  # Total Pickup count
-                row_data[f'{year} Replacement Cost (Est.)'] = round(year_data['ice_total_cost_actual'], 0)  # Round for Excel
+                row_data[f'"{year}\nUnits"'] = year_data['l_pickup_vehicles_total']  # Total Pickup count
+                row_data[f'{year}'] = round(year_data['ice_total_cost_actual'], 0)  # Round for Excel
             elif i == 4:  # L - Avg Unit Pick Up EV Chassis
-                row_data[f'{year} Vehicle Count'] = 1  # Always 1 unit
-                row_data[f'{year} Replacement Cost (Est.)'] = EV_CHASSIS_COST_PICKUP  # Cost per EV unit
+                row_data[f'"{year}\nUnits"'] = 1  # Always 1 unit
+                row_data[f'{year}'] = EV_CHASSIS_COST_PICKUP  # Cost per EV unit
             elif i == 5:  # L - EV's needed based on 3 to 1 ratio
-                row_data[f'{year} Vehicle Count'] = year_data['ev_vehicles_needed_rounded']  # EV count needed
-                row_data[f'{year} Replacement Cost (Est.)'] = round(year_data['ev_needed_cost_actual'], 0)  # Round for Excel
+                row_data[f'"{year}\nUnits"'] = year_data['ev_vehicles_needed_rounded']  # EV count needed
+                row_data[f'{year}'] = round(year_data['ev_needed_cost_actual'], 0)  # Round for Excel
             elif i == 7:  # L - 100% Pick Up ICE Vehicles less 3-1 EV Vehicle Purchase Ratio
-                row_data[f'{year} Vehicle Count'] = year_data['ice_less_ev_rounded']  # ICE remaining count
-                row_data[f'{year} Replacement Cost (Est.)'] = round(year_data['ice_less_ev_cost_actual'], 0)  # Round for Excel
+                row_data[f'"{year}\nUnits"'] = year_data['ice_less_ev_rounded']  # ICE remaining count
+                row_data[f'{year}'] = round(year_data['ice_less_ev_cost_actual'], 0)  # Round for Excel
             elif i == 9:  # Budget Total of 3-1 Ratio Scenario EVs and ICE
-                row_data[f'{year} Vehicle Count'] = 0  # No vehicle count for total row
-                row_data[f'{year} Replacement Cost (Est.)'] = round(year_data['budget_total_cost_actual'], 0)  # Round for Excel
+                row_data[f'"{year}\nUnits"'] = 0  # No vehicle count for total row
+                row_data[f'{year}'] = round(year_data['budget_total_cost_actual'], 0)  # Round for Excel
             elif i == 10:  # EV Premium Impact to Budget
-                row_data[f'{year} Vehicle Count'] = 0  # No vehicle count for impact row
-                row_data[f'{year} Replacement Cost (Est.)'] = round(year_data['ev_premium_impact_actual'], 0)  # Round for Excel
+                row_data[f'"{year}\nUnits"'] = 0  # No vehicle count for impact row
+                row_data[f'{year}'] = round(year_data['ev_premium_impact_actual'], 0)  # Round for Excel
             else:
-                row_data[f'{year} Vehicle Count'] = 0  # Placeholder for other rows
-                row_data[f'{year} Replacement Cost (Est.)'] = 0
+                row_data[f'"{year}\nUnits"'] = 0  # Placeholder for other rows
+                row_data[f'{year}'] = 0
         
         pickup_data.append(row_data)
     
@@ -2503,35 +2478,35 @@ def create_pickup_ev_analysis():
         
         # Set specific values based on row type (using 2026 as reference year)
         if i == 1:  # L - 100% Pick Up ICE Vehicle per Budget
-            row_data['2026 Units'] = 1  # 1 unit for calculation
+            row_data['"2026\nUnits"'] = 1  # 1 unit for calculation
             row_data['Avg. Chassis Cost'] = ICE_CHASSIS_COST_PICKUP  # Use variable
             row_data['Notes'] = 'Per unit calculation'
         elif i == 2:  # L - $ TOTAL 100% Pick Up ICE Vehicle ****
-            row_data['2026 Units'] = ref_data['l_pickup_vehicles_total']  # Total Pickup count
+            row_data['"2026\nUnits"'] = ref_data['l_pickup_vehicles_total']  # Total Pickup count
             row_data['Avg. Chassis Cost'] = round(ref_data['ice_total_cost_actual'], 0)  # Round for Excel display
             row_data['Notes'] = f'Total L Pickup vehicles ({ref_data["l_pickup_vehicles_total"]}) all ICE cost'
         elif i == 4:  # L - Avg Unit Pick Up EV Chassis
-            row_data['2026 Units'] = 1  # 1 unit for calculation
+            row_data['"2026\nUnits"'] = 1  # 1 unit for calculation
             row_data['Avg. Chassis Cost'] = EV_CHASSIS_COST_PICKUP  # Use variable
             row_data['Notes'] = 'Per EV Pickup unit calculation'
         elif i == 5:  # L - EV's needed based on 3 to 1 ratio
-            row_data['2026 Units'] = ref_data['ev_vehicles_needed_rounded']  # Rounded for display
+            row_data['"2026\nUnits"'] = ref_data['ev_vehicles_needed_rounded']  # Rounded for display
             row_data['Avg. Chassis Cost'] = round(ref_data['ev_needed_cost_actual'], 0)  # Round for Excel display
             row_data['Notes'] = f'L Pickup vehicles ({ref_data["l_pickup_vehicles_total"]}) / {LIGHT_EV_RATIO_TOTAL} = {ref_data["ev_vehicles_needed_actual"]:.2f}'
         elif i == 7:  # L - 100% Pick Up ICE Vehicles less 3-1 EV Vehicle Purchase Ratio
-            row_data['2026 Units'] = ref_data['ice_less_ev_rounded']  # Rounded for display
+            row_data['"2026\nUnits"'] = ref_data['ice_less_ev_rounded']  # Rounded for display
             row_data['Avg. Chassis Cost'] = round(ref_data['ice_less_ev_cost_actual'], 0)  # Round for Excel display
             row_data['Notes'] = f'L Pickup vehicles remaining as ICE after 3:1 ratio ({ref_data["ice_vehicles_actual"]:.2f})'
         elif i == 9:  # Budget Total of 3-1 Ratio Scenario EVs and ICE
-            row_data['2026 Units'] = 0  # No units for total row
+            row_data['"2026\nUnits"'] = 0  # No units for total row
             row_data['Avg. Chassis Cost'] = round(ref_data['budget_total_cost_actual'], 0)  # Round for Excel display
             row_data['Notes'] = f'Total budget: ICE remaining (${ref_data["ice_less_ev_cost_actual"]:,.0f}) + EV needed (${ref_data["ev_needed_cost_actual"]:,.0f})'
         elif i == 10:  # EV Premium Impact to Budget
-            row_data['2026 Units'] = 0  # No units for impact row
+            row_data['"2026\nUnits"'] = 0  # No units for impact row
             row_data['Avg. Chassis Cost'] = round(ref_data['ev_premium_impact_actual'], 0)  # Round for Excel display
             row_data['Notes'] = f'Budget impact: Total (${ref_data["budget_total_cost_actual"]:,.0f}) - Original ICE (${ref_data["ice_total_cost_actual"]:,.0f})'
         else:
-            row_data['2026 Units'] = 0  # Placeholder for other rows
+            row_data['"2026\nUnits"'] = 0  # Placeholder for other rows
             row_data['Avg. Chassis Cost'] = 0
             row_data['Notes'] = ''
         
@@ -2541,29 +2516,29 @@ def create_pickup_ev_analysis():
             
             # Set vehicle counts and costs based on row type
             if i == 1:  # L - 100% Pick Up ICE Vehicle per Budget
-                row_data[f'{year} Vehicle Count'] = 1  # Always 1 unit
-                row_data[f'{year} Replacement Cost (Est.)'] = ICE_CHASSIS_COST_PICKUP  # Cost per unit
+                row_data[f'"{year}\nUnits"'] = 1  # Always 1 unit
+                row_data[f'{year}'] = ICE_CHASSIS_COST_PICKUP  # Cost per unit
             elif i == 2:  # L - $ TOTAL 100% Pick Up ICE Vehicle ****
-                row_data[f'{year} Vehicle Count'] = year_data['l_pickup_vehicles_total']  # Total Pickup count
-                row_data[f'{year} Replacement Cost (Est.)'] = round(year_data['ice_total_cost_actual'], 0)  # Round for Excel
+                row_data[f'"{year}\nUnits"'] = year_data['l_pickup_vehicles_total']  # Total Pickup count
+                row_data[f'{year}'] = round(year_data['ice_total_cost_actual'], 0)  # Round for Excel
             elif i == 4:  # L - Avg Unit Pick Up EV Chassis
-                row_data[f'{year} Vehicle Count'] = 1  # Always 1 unit
-                row_data[f'{year} Replacement Cost (Est.)'] = EV_CHASSIS_COST_PICKUP  # Cost per EV unit
+                row_data[f'"{year}\nUnits"'] = 1  # Always 1 unit
+                row_data[f'{year}'] = EV_CHASSIS_COST_PICKUP  # Cost per EV unit
             elif i == 5:  # L - EV's needed based on 3 to 1 ratio
-                row_data[f'{year} Vehicle Count'] = year_data['ev_vehicles_needed_rounded']  # EV count needed
-                row_data[f'{year} Replacement Cost (Est.)'] = round(year_data['ev_needed_cost_actual'], 0)  # Round for Excel
+                row_data[f'"{year}\nUnits"'] = year_data['ev_vehicles_needed_rounded']  # EV count needed
+                row_data[f'{year}'] = round(year_data['ev_needed_cost_actual'], 0)  # Round for Excel
             elif i == 7:  # L - 100% Pick Up ICE Vehicles less 3-1 EV Vehicle Purchase Ratio
-                row_data[f'{year} Vehicle Count'] = year_data['ice_less_ev_rounded']  # ICE remaining count
-                row_data[f'{year} Replacement Cost (Est.)'] = round(year_data['ice_less_ev_cost_actual'], 0)  # Round for Excel
+                row_data[f'"{year}\nUnits"'] = year_data['ice_less_ev_rounded']  # ICE remaining count
+                row_data[f'{year}'] = round(year_data['ice_less_ev_cost_actual'], 0)  # Round for Excel
             elif i == 9:  # Budget Total of 3-1 Ratio Scenario EVs and ICE
-                row_data[f'{year} Vehicle Count'] = 0  # No vehicle count for total row
-                row_data[f'{year} Replacement Cost (Est.)'] = round(year_data['budget_total_cost_actual'], 0)  # Round for Excel
+                row_data[f'"{year}\nUnits"'] = 0  # No vehicle count for total row
+                row_data[f'{year}'] = round(year_data['budget_total_cost_actual'], 0)  # Round for Excel
             elif i == 10:  # EV Premium Impact to Budget
-                row_data[f'{year} Vehicle Count'] = 0  # No vehicle count for impact row
-                row_data[f'{year} Replacement Cost (Est.)'] = round(year_data['ev_premium_impact_actual'], 0)  # Round for Excel
+                row_data[f'"{year}\nUnits"'] = 0  # No vehicle count for impact row
+                row_data[f'{year}'] = round(year_data['ev_premium_impact_actual'], 0)  # Round for Excel
             else:
-                row_data[f'{year} Vehicle Count'] = 0  # Placeholder for other rows
-                row_data[f'{year} Replacement Cost (Est.)'] = 0
+                row_data[f'"{year}\nUnits"'] = 0  # Placeholder for other rows
+                row_data[f'{year}'] = 0
         
         pickup_data.append(row_data)
     
