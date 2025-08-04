@@ -67,14 +67,14 @@ export const UploadPage: React.FC = () => {
                 ...upload, 
                 progress: 100, 
                 status: 'success',
-                recordsCount: response.data?.records_count
+                recordsCount: undefined // API doesn't return record count for uploads
               }
             : upload
         ));
         
         toast({
           title: "Upload successful",
-          description: `${file.name} uploaded successfully`,
+          description: response.data?.message || `${file.name} uploaded successfully`,
         });
       } else {
         setUploadStatus(prev => prev.map(upload => 

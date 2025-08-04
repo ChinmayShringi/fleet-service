@@ -59,8 +59,17 @@ export const FleetPage: React.FC = () => {
       try {
         const response = await apiService.getVehicleFleetData();
         if (response.success && response.data) {
-          setVehicles(response.data);
-          setFilteredVehicles(response.data);
+          // API returns { data: VehicleData[], columns: string[], row_count: number }
+          const vehicleData = response.data.data || [];
+          setVehicles(vehicleData);
+          setFilteredVehicles(vehicleData);
+          
+          if (vehicleData.length > 0) {
+            toast({
+              title: "Data Loaded",
+              description: `Loaded ${response.data.row_count || vehicleData.length} vehicles from server`,
+            });
+          }
         } else {
           // Generate demo data for testing
           const demoData = Array.from({ length: 500 }, (_, i) => ({
@@ -74,8 +83,27 @@ export const FleetPage: React.FC = () => {
           }));
           setVehicles(demoData);
           setFilteredVehicles(demoData);
+          
+          toast({
+            title: "Demo Mode",
+            description: "Using demo data - upload fleet data to see real information",
+            variant: "default",
+          });
         }
       } catch (error) {
+        // Generate demo data on error
+        const demoData = Array.from({ length: 500 }, (_, i) => ({
+          Equipment: `FL-${String(i + 1).padStart(4, '0')}`,
+          Make: ['Ford', 'Chevrolet', 'Toyota', 'Honda', 'Nissan'][i % 5],
+          Model: ['F-150', 'Silverado', 'Camry', 'Accord', 'Altima'][i % 5],
+          Year: 2018 + (i % 6),
+          Cost: Math.floor(Math.random() * 50000) + 20000,
+          Location: ['Newark', 'Trenton', 'Camden', 'Paterson', 'Edison'][i % 5],
+          Status: ['Active', 'Maintenance', 'Inactive'][i % 3],
+        }));
+        setVehicles(demoData);
+        setFilteredVehicles(demoData);
+        
         toast({
           title: "Connection Error",
           description: "Unable to connect to server, showing demo data",

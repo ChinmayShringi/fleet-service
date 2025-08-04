@@ -1,13 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { toast } from '@/hooks/use-toast';
-import { apiService } from '@/services/apiService';
+import { apiService, User } from '@/services/apiService';
 
-interface User {
-  id: string;
-  username: string;
-  email: string;
-  role: 'Admin' | 'User';
-}
+// User interface now imported from apiService
 
 interface AuthContextType {
   user: User | null;
@@ -51,10 +46,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Allow admin/admin for demo purposes
       if (username === 'admin' && password === 'admin') {
         const userData: User = {
-          id: '1',
+          id: 1,
           username: 'admin',
           email: 'admin@pseg.com',
           role: 'Admin',
+          full_name: 'System Administrator',
+          is_active: true
         };
         
         setUser(userData);
@@ -69,23 +66,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return true;
       }
 
-      // Try API login for other users
-      const response = await fetch('http://localhost:3300/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ username, password }),
-      });
+      // Use API service for login
+      const response = await apiService.login(username, password);
 
-      const data = await response.json();
-
-      if (response.ok && data.success) {
+      if (response.success && response.data) {
         const userData: User = {
-          id: data.user_id || '2',
-          username: data.username || username,
-          email: data.email || `${username}@pseg.com`,
-          role: data.role || 'User',
+          id: response.data.id,
+          username: response.data.username,
+          email: response.data.email,
+          role: response.data.role,
+          full_name: response.data.full_name,
+          is_active: response.data.is_active
         };
         
         setUser(userData);
@@ -100,7 +91,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } else {
         toast({
           title: "Login Failed",
-          description: data.message || "Invalid credentials",
+          description: response.error || "Invalid credentials",
           variant: "destructive",
         });
         return false;
@@ -117,10 +108,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const register = async (username: string, password: string, email: string, role: string): Promise<boolean> => {
+  const register = async (username: string, password: string, email: string, role: string = 'user', full_name?: string): Promise<boolean> => {
     setIsLoading(true);
     try {
-      const response = await apiService.register(username, password, email);
+      const response = await apiService.register(username, password, email, full_name, role);
       
       if (response.success) {
         toast({

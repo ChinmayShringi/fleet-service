@@ -70,28 +70,40 @@ export const AppSidebar: React.FC = () => {
 
         {/* Navigation */}
         <SidebarGroup>
-          <SidebarGroupLabel>Navigation</SidebarGroupLabel>
+          <SidebarGroupLabel className="text-muted-foreground font-medium px-3 mb-2">Navigation</SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu>
-              {filteredNavigationItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <NavLink
-                      to={item.url}
-                      className={({ isActive: navIsActive }) =>
-                        `flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors ${
-                          isActive(item.url) || navIsActive
-                            ? 'bg-primary text-primary-foreground font-medium'
-                            : 'text-foreground hover:bg-accent hover:text-accent-foreground'
-                        }`
-                      }
+            <SidebarMenu className="space-y-1 px-2">
+              {filteredNavigationItems.map((item) => {
+                const active = isActive(item.url);
+                return (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton 
+                      asChild 
+                      className={`w-full transition-all duration-200 ${
+                        active 
+                          ? 'bg-primary text-primary-foreground shadow-sm font-medium' 
+                          : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
+                      }`}
                     >
-                      <item.icon className="w-4 h-4 flex-shrink-0" />
-                      {!collapsed && <span>{item.title}</span>}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+                      <NavLink
+                        to={item.url}
+                        className="flex items-center space-x-3 px-3 py-2.5 rounded-lg no-underline"
+                      >
+                        <item.icon className={`w-4 h-4 flex-shrink-0 ${
+                          active ? 'text-primary-foreground' : 'text-inherit'
+                        }`} />
+                        {!collapsed && (
+                          <span className={`text-sm ${
+                            active ? 'text-primary-foreground font-medium' : 'text-inherit'
+                          }`}>
+                            {item.title}
+                          </span>
+                        )}
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

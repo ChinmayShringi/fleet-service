@@ -4,31 +4,79 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Users, UserPlus, Shield, Activity } from 'lucide-react';
-import { apiService, UserStats } from '@/services/apiService';
+import { apiService, UserStats, User } from '@/services/apiService';
+import { toast } from '@/hooks/use-toast';
 
 export const UsersPage: React.FC = () => {
   const [userStats, setUserStats] = useState<UserStats>({
     total_users: 0,
-    active_sessions: 0,
-    recent_logins: 0,
+    active_users: 0,
+    inactive_users: 0,
   });
+  const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const fetchUserStats = async () => {
+    const fetchData = async () => {
       try {
-        const response = await apiService.getUserStats();
-        if (response.success && response.data) {
-          setUserStats(response.data);
+        // Fetch user stats and user list in parallel
+        const [statsResponse, usersResponse] = await Promise.all([
+          apiService.getUserStats(),
+          apiService.getAllUsers()
+        ]);
+        
+        if (statsResponse.success && statsResponse.data) {
+          setUserStats(statsResponse.data);
+        }
+        
+        if (usersResponse.success && usersResponse.data) {
+          setUsers(usersResponse.data.users || []);
+          toast({
+            title: "Users Loaded",
+            description: `Loaded ${usersResponse.data.count || usersResponse.data.users?.length || 0} users`,
+          });
+        } else {
+          // Fallback to mock users if API fails
+          setUsers(mockUsers.map(user => ({
+            id: user.id,
+            username: user.name.toLowerCase().replace(' ', '.'),
+            email: user.email,
+            full_name: user.name,
+            role: user.role,
+            is_active: user.status === 'active',
+            last_login: user.lastLogin
+          })));
+          
+          toast({
+            title: "Using Demo Data",
+            description: "Could not load users from server, showing demo data",
+            variant: "default",
+          });
         }
       } catch (error) {
-        console.error('Failed to fetch user stats:', error);
+        console.error('Failed to fetch data:', error);
+        // Use mock data on error
+        setUsers(mockUsers.map(user => ({
+          id: user.id,
+          username: user.name.toLowerCase().replace(' ', '.'),
+          email: user.email,
+          full_name: user.name,
+          role: user.role,
+          is_active: user.status === 'active',
+          last_login: user.lastLogin
+        })));
+        
+        toast({
+          title: "Connection Error",
+          description: "Unable to connect to server, showing demo data",
+          variant: "destructive",
+        });
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchUserStats();
+    fetchData();
   }, []);
 
   const mockUsers = [
@@ -105,8 +153,8 @@ export const UsersPage: React.FC = () => {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Active Sessions</p>
-                <p className="text-2xl font-bold">{userStats.active_sessions || 4}</p>
+                <p className="text-sm font-medium text-muted-foreground">Active Users</p>
+                <p className="text-2xl font-bold">{userStats.active_users || users.filter(u => u.is_active).length}</p>
               </div>
               <Activity className="w-8 h-8 text-primary" />
             </div>
@@ -117,9 +165,9 @@ export const UsersPage: React.FC = () => {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Recent Logins</p>
-                <p className="text-2xl font-bold">{userStats.recent_logins || 8}</p>
-                <p className="text-xs text-muted-foreground">Last 24 hours</p>
+                <p className="text-sm font-medium text-muted-foreground">Inactive Users</p>
+                <p className="text-2xl font-bold">{userStats.inactive_users || users.filter(u => !u.is_active).length}</p>
+                <p className="text-xs text-muted-foreground">Disabled accounts</p>
               </div>
               <Shield className="w-8 h-8 text-primary" />
             </div>
@@ -130,28 +178,33 @@ export const UsersPage: React.FC = () => {
       {/* Users List */}
       <Card>
         <CardHeader>
-          <CardTitle>System Users</CardTitle>
+          <CardTitle>System Users ({users.length})</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {mockUsers.map((user) => (
+            {users.map((user) => (
               <div key={user.id} className="flex items-center justify-between p-4 border border-border rounded-lg hover:bg-accent transition-colors">
                 <div className="flex items-center space-x-4">
                   <Avatar>
                     <AvatarFallback className="bg-primary text-primary-foreground">
-                      {user.name.split(' ').map(n => n[0]).join('')}
+                      {(user.full_name || user.username).split(' ').map(n => n[0]).join('').toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
                   <div>
-                    <h3 className="font-medium text-foreground">{user.name}</h3>
+                    <h3 className="font-medium text-foreground">{user.full_name || user.username}</h3>
                     <p className="text-sm text-muted-foreground">{user.email}</p>
-                    <p className="text-xs text-muted-foreground">Last login: {user.lastLogin}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {user.last_login ? `Last login: ${user.last_login}` : 'Never logged in'}
+                    </p>
+                    {user.created_at && (
+                      <p className="text-xs text-muted-foreground">Created: {new Date(user.created_at).toLocaleDateString()}</p>
+                    )}
                   </div>
                 </div>
                 
                 <div className="flex items-center space-x-3">
                   {getRoleBadge(user.role)}
-                  {getStatusBadge(user.status)}
+                  {getStatusBadge(user.is_active ? 'active' : 'inactive')}
                   <Button variant="outline" size="sm">
                     Edit
                   </Button>

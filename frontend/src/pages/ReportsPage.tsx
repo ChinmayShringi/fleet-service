@@ -10,10 +10,12 @@ import { toast } from '@/hooks/use-toast';
 interface ReportExecution {
   id: string;
   name: string;
+  description: string;
+  generatedFiles: string[];
   status: 'idle' | 'running' | 'completed' | 'error';
   progress: number;
   executionTime?: number;
-  generatedFiles?: string[];
+  output?: string;
   error?: string;
 }
 
@@ -22,18 +24,31 @@ export const ReportsPage: React.FC = () => {
     {
       id: 'excel-analysis',
       name: 'Excel Analysis Report',
+      description: 'Generate comprehensive 10-year vehicle replacement forecasting with electric vehicle transition analysis and radio equipment cost projections',
+      generatedFiles: [
+        'electric_vehicle_budget_analysis.xlsx',
+        'radio_equipment_cost_analysis.xlsx', 
+        'vehicle_replacement_detailed_forecast.xlsx',
+        'vehicle_replacement_by_category.xlsx'
+      ],
       status: 'idle',
       progress: 0,
     },
     {
       id: 'lob-pivot',
       name: 'LOB Pivot Generator',
+      description: 'Generate Line of Business equipment lifecycle pivot tables with hierarchical cost analysis by business unit',
+      generatedFiles: [
+        'equipment_lifecycle_by_business_unit.xlsx'
+      ],
       status: 'idle',
       progress: 0,
     },
     {
       id: 'ool-reader',
       name: 'Out-of-Life Analysis',
+      description: 'Process out-of-life equipment data and update replacement schedules with detailed lifecycle tracking',
+      generatedFiles: [],
       status: 'idle',
       progress: 0,
     },
@@ -75,14 +90,15 @@ export const ReportsPage: React.FC = () => {
       clearInterval(progressInterval);
 
       if (response.success) {
+        const startTime = Date.now();
         setReports(prev => prev.map(report => 
           report.id === reportId
             ? { 
                 ...report, 
                 status: 'completed', 
                 progress: 100,
-                executionTime: response.data?.execution_time,
-                generatedFiles: response.data?.reports_generated || response.data?.files_generated || []
+                executionTime: (Date.now() - startTime) / 1000,
+                output: response.data?.output
               }
             : report
         ));
@@ -191,9 +207,7 @@ export const ReportsPage: React.FC = () => {
               <div className="flex items-center justify-between">
                 <div className="space-y-1">
                   <p className="text-sm text-muted-foreground">
-                    {report.id === 'excel-analysis' && 'Generate comprehensive analysis with 4 Excel reports'}
-                    {report.id === 'lob-pivot' && 'Generate Line of Business pivot tables'}
-                    {report.id === 'ool-reader' && 'Process out-of-life equipment data'}
+                    {report.description}
                   </p>
                   {report.executionTime && (
                     <p className="text-xs text-muted-foreground">
@@ -228,16 +242,34 @@ export const ReportsPage: React.FC = () => {
                 </div>
               )}
 
+              {report.output && report.status === 'completed' && (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Execution Output:</p>
+                  <div className="max-h-32 overflow-y-auto p-3 bg-muted rounded-lg">
+                    <pre className="text-xs whitespace-pre-wrap text-muted-foreground">
+                      {report.output}
+                    </pre>
+                  </div>
+                </div>
+              )}
+
               {report.generatedFiles && report.generatedFiles.length > 0 && (
                 <div className="space-y-2">
-                  <p className="text-sm font-medium">Generated Files:</p>
+                  <p className="text-sm font-medium">
+                    Expected Generated Files:
+                    {report.status === 'completed' && (
+                      <span className="text-xs text-muted-foreground ml-2">
+                        (Check server database/ folder)
+                      </span>
+                    )}
+                  </p>
                   <div className="space-y-1">
                     {report.generatedFiles.map((file, index) => (
                       <div key={index} className="flex items-center justify-between p-2 bg-accent rounded">
                         <span className="text-sm">{file}</span>
-                        <Button variant="ghost" size="sm">
-                          <Download className="w-3 h-3" />
-                        </Button>
+                        <Badge variant="outline" className="text-xs">
+                          Excel Report
+                        </Badge>
                       </div>
                     ))}
                   </div>
