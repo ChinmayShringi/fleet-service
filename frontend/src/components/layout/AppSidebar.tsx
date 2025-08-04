@@ -35,20 +35,32 @@ const navigationItems = [
 
 export const AppSidebar: React.FC = () => {
   const { state } = useSidebar();
-  const { hasRole } = useAuth();
+  const { hasRole, user } = useAuth();
   const location = useLocation();
   const currentPath = location.pathname;
   const collapsed = state === 'collapsed';
 
   const isActive = (path: string) => currentPath === path || (path === '/dashboard' && currentPath === '/');
 
+  // Debug: Log user info to help troubleshoot
+  console.log('AppSidebar - Current user:', user);
+  console.log('AppSidebar - hasRole("Admin"):', hasRole('Admin'));
+  console.log('AppSidebar - user?.role:', user?.role);
+
   // Filter navigation items based on user role
   const filteredNavigationItems = navigationItems.filter(item => {
     if (item.title === 'Users') {
-      return hasRole('Admin'); // Only show Users to Admin
+      const isAdmin = hasRole('Admin');
+      console.log('AppSidebar - Filtering Users item, isAdmin:', isAdmin);
+      // Also try case-insensitive check as fallback
+      const isAdminCaseInsensitive = user?.role?.toLowerCase() === 'admin';
+      console.log('AppSidebar - Case insensitive admin check:', isAdminCaseInsensitive);
+      return isAdmin || isAdminCaseInsensitive; // Only show Users to Admin
     }
     return true;
   });
+
+  console.log('AppSidebar - Filtered navigation items:', filteredNavigationItems.map(i => i.title));
 
   return (
     <Sidebar className={collapsed ? 'w-14' : 'w-64'} collapsible="icon">
