@@ -1,22 +1,23 @@
 import pandas as pd
 import os
+from constants.file_constants import get_input_file, get_output_file, get_input_file_safe, ensure_database_directory
 
 def read_ool_headers():
     """Read OOL.xlsx file and print its headers with multi-level structure"""
     try:
         # Check if file exists
-        if not os.path.exists('OOL.xlsx'):
-            print("Error: OOL.xlsx file not found in the current directory")
+        ool_file = get_input_file_safe("EQUIPMENT_LIFECYCLE_REFERENCE")
+        if ool_file is None:
             return
         
         # Read the Excel file with multi-level headers
-        print("Reading OOL.xlsx file...")
+        print(f"Reading {ool_file} file...")
         
         # First, read with default settings to see structure
-        df_default = pd.read_excel('OOL.xlsx')
+        df_default = pd.read_excel(ool_file)
         
         # Try reading with multi-level headers (first 2 rows as headers)
-        df_multiheader = pd.read_excel('OOL.xlsx', header=[0, 1])
+        df_multiheader = pd.read_excel(ool_file, header=[0, 1])
         
         print("\n=== OOL.xlsx Structure Analysis ===")
         print(f"Total columns: {len(df_default.columns)}")
@@ -66,7 +67,11 @@ def read_ool_data_properly():
     """Read OOL.xlsx file with proper header structure"""
     try:
         # Read the file skipping the first 2 rows and no header
-        df = pd.read_excel('OOL.xlsx', skiprows=2, header=None)
+        ool_file = get_input_file_safe("EQUIPMENT_LIFECYCLE_REFERENCE")
+        if ool_file is None:
+            print("No equipment lifecycle reference data found. Please ensure the file exists.")
+            return None
+        df = pd.read_excel(ool_file, skiprows=2, header=None)
         
         # Set proper column names based on the structure you described
         column_names = [
@@ -227,7 +232,7 @@ def update_equipment_replacement_schedule(equipment_ids, new_replacement_year):
                     print(f"    WARNING: Column {forecast_col} not found")
         
         # Save updated data back to Excel
-        output_filename = 'data_updated.xlsx'
+        output_filename = get_output_file("VEHICLE_FLEET_UPDATED_DATA")
         df_data.to_excel(output_filename, index=False)
         print(f"\nSUCCESS: Updated data saved to {output_filename}")
         
@@ -278,7 +283,7 @@ def save_pivot_to_excel(pivot_data, lifecycle_stats, not_found_count, total_equi
     Save the LOB pivot table to an Excel file
     """
     try:
-        output_filename = 'LOB_Equipment_Lifecycle_Pivot.xlsx'
+        output_filename = get_output_file("EQUIPMENT_LIFECYCLE_BY_BUSINESS_UNIT")
         
         # Create a list to store all data for Excel
         excel_data = []
@@ -334,12 +339,20 @@ def create_lob_lifecycle_pivot():
         print("=== LOB Equipment Lifecycle Pivot Table ===")
         
         # Read data.xlsx
-        print("Reading data.xlsx...")
-        df_data = pd.read_excel('data.xlsx')
+        data_file = get_input_file_safe("VEHICLE_FLEET_MASTER_DATA")
+        if data_file is None:
+            print("No vehicle fleet master data found. Please ensure the file exists.")
+            return None
+        print(f"Reading {data_file}...")
+        df_data = pd.read_excel(data_file)
         
         # Read OOL.xlsx with proper structure
-        print("Reading OOL.xlsx...")
-        df_ool = pd.read_excel('OOL.xlsx', skiprows=2, header=None)
+        ool_file = get_input_file_safe("EQUIPMENT_LIFECYCLE_REFERENCE")
+        if ool_file is None:
+            print("No equipment lifecycle reference data found. Please ensure the file exists.")
+            return None
+        print(f"Reading {ool_file}...")
+        df_ool = pd.read_excel(ool_file, skiprows=2, header=None)
         
         # Set proper column names for OOL data
         ool_column_names = [

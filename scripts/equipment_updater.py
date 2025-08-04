@@ -6,6 +6,7 @@ based on lifecycle data from OOL.xlsx.
 """
 
 from ool_reader import update_specific_equipment
+from constants.file_constants import get_input_file_safe
 
 def debug_equipment_lookup(equipment_id):
     """Debug function to check what's happening with equipment lookup"""
@@ -14,8 +15,12 @@ def debug_equipment_lookup(equipment_id):
     print(f"=== DEBUGGING EQUIPMENT {equipment_id} ===")
     
     # Read data.xlsx
-    print("1. Reading data.xlsx...")
-    df_data = pd.read_excel('data.xlsx')
+    data_file = get_input_file_safe("VEHICLE_FLEET_MASTER_DATA")
+    if data_file is None:
+        print("No vehicle fleet master data found. Please ensure the file exists.")
+        return
+    print(f"1. Reading {data_file}...")
+    df_data = pd.read_excel(data_file)
     
     # Find equipment in data.xlsx
     equipment_row = df_data[df_data['Equipment'] == equipment_id]
@@ -33,8 +38,12 @@ def debug_equipment_lookup(equipment_id):
     print(f"    Equipment descriptn: '{equipment_desc}'")
     
     # Read OOL.xlsx
-    print("\n2. Reading OOL.xlsx...")
-    df_ool = pd.read_excel('OOL.xlsx', skiprows=2, header=None)
+    ool_file = get_input_file_safe("EQUIPMENT_LIFECYCLE_REFERENCE")
+    if ool_file is None:
+        print("No equipment lifecycle reference data found. Please ensure the file exists.")
+        return
+    print(f"\n2. Reading {ool_file}...")
+    df_ool = pd.read_excel(ool_file, skiprows=2, header=None)
     
     # Set proper column names for OOL data
     ool_column_names = [

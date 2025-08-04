@@ -1,11 +1,16 @@
 import pandas as pd
 import shutil
 import os
+from constants.file_constants import get_input_file_safe, get_output_file, get_sheet_name, ensure_database_directory
 
 def calculate_vehicle_data():
     """Calculate vehicle counts and replacement costs for H, L, P categories from data.xlsx for years 2026-2035"""
     # Read the data Excel file
-    df_data = pd.read_excel('data.xlsx')
+    data_file = get_input_file_safe("VEHICLE_FLEET_MASTER_DATA")
+    if data_file is None:
+        print("No vehicle fleet master data found. Returning empty results.")
+        return {}, {}
+    df_data = pd.read_excel(data_file)
     
     # Initialize dictionaries to store results for all years
     years = range(2026, 2036)  # 2026 to 2035
@@ -239,10 +244,10 @@ def create_ev_assumption_pivot_table():
     ev_pivot = pd.concat([ev_pivot, pd.DataFrame([padding_row_4])], ignore_index=True)
     
     # Create output directory if it doesn't exist
-    os.makedirs('output', exist_ok=True)
+    ensure_database_directory()
     
     # Save the EV assumption pivot table to output folder
-    output_path = 'output/EV_ASSUMPTION_Analysis.xlsx'
+    output_path = get_output_file("ELECTRIC_VEHICLE_BUDGET_ANALYSIS")
     
     # Individual EV analyses will be in separate sheets to avoid column format conflicts
     print("\nPreparing individual EV analyses for separate sheets...")
@@ -266,13 +271,13 @@ def create_ev_assumption_pivot_table():
 
     with pd.ExcelWriter(output_path, engine='openpyxl') as writer:
         # Main EV Summary sheet (clean format without mixed columns)
-        ev_pivot.to_excel(writer, sheet_name='EV_Summary', index=False)
+        ev_pivot.to_excel(writer, sheet_name=get_sheet_name('EV_SUMMARY'), index=False)
         
         # Individual EV analyses in separate sheets (with their own format)
-        freightliner_df.to_excel(writer, sheet_name='Freightliner_EV', index=False)
-        van_df.to_excel(writer, sheet_name='Van_EV', index=False)
-        car_suv_df.to_excel(writer, sheet_name='Car_SUV_EV', index=False)
-        pickup_df.to_excel(writer, sheet_name='Pickup_EV', index=False)
+        freightliner_df.to_excel(writer, sheet_name=get_sheet_name('FREIGHTLINER_EV'), index=False)
+        van_df.to_excel(writer, sheet_name=get_sheet_name('VAN_EV'), index=False)
+        car_suv_df.to_excel(writer, sheet_name=get_sheet_name('CAR_SUV_EV'), index=False)
+        pickup_df.to_excel(writer, sheet_name=get_sheet_name('PICKUP_EV'), index=False)
         
         # Also create separate pivot tables for counts and costs
         count_data = []
@@ -296,8 +301,8 @@ def create_ev_assumption_pivot_table():
         count_data.append(count_grand)
         cost_data.append(cost_grand)
         
-        pd.DataFrame(count_data).to_excel(writer, sheet_name='Vehicle_Counts', index=False)
-        pd.DataFrame(cost_data).to_excel(writer, sheet_name='Replacement_Costs', index=False)
+        pd.DataFrame(count_data).to_excel(writer, sheet_name=get_sheet_name('VEHICLE_COUNTS'), index=False)
+        pd.DataFrame(cost_data).to_excel(writer, sheet_name=get_sheet_name('REPLACEMENT_COSTS'), index=False)
     
     
     for i, vehicle_class in enumerate(vehicle_classes + ['Grand Total', 'Radio Installation Expense', 'Total pre EV with Radio Installs']):
@@ -340,7 +345,11 @@ def analyze_radio_installation_by_lob():
     """Analyze Radio Installation Expense by LOB using pivot tables"""
     
     # Read the data Excel file
-    df_data = pd.read_excel('data.xlsx')
+    data_file = get_input_file_safe("VEHICLE_FLEET_MASTER_DATA")
+    if data_file is None:
+        print("No vehicle fleet master data found. Returning empty results.")
+        return {}, {}
+    df_data = pd.read_excel(data_file)
     
     print("=== Radio Installation Expense Analysis ===\n")
     
@@ -474,7 +483,8 @@ def create_radio_pivot_table():
         print(grand_row)
         
         # Save to Excel
-        os.makedirs('output', exist_ok=True)
+        from constants.file_constants import ensure_output_directory
+        ensure_output_directory()
         
         # Create combined summary with separate count and cost columns
         combined_data = []
@@ -502,13 +512,14 @@ def create_radio_pivot_table():
         # Add grand total as the last row
         combined_pivot = pd.concat([combined_pivot, pd.DataFrame([grand_total_row])], ignore_index=True)
         
-        with pd.ExcelWriter('output/Radio_Installation_Analysis.xlsx') as writer:
-            combined_pivot.to_excel(writer, sheet_name='Combined_Summary')
-            count_pivot.to_excel(writer, sheet_name='Radio_Counts')
-            spend_pivot.to_excel(writer, sheet_name='Radio_Spends')
-            df_pivot.to_excel(writer, sheet_name='Raw_Data', index=False)
+        radio_output_path = get_output_file("RADIO_EQUIPMENT_COST_ANALYSIS")
+        with pd.ExcelWriter(radio_output_path) as writer:
+            combined_pivot.to_excel(writer, sheet_name=get_sheet_name('COMBINED_SUMMARY'))
+            count_pivot.to_excel(writer, sheet_name=get_sheet_name('RADIO_COUNTS'))
+            spend_pivot.to_excel(writer, sheet_name=get_sheet_name('RADIO_SPENDS'))
+            df_pivot.to_excel(writer, sheet_name=get_sheet_name('RAW_DATA'), index=False)
         
-        print(f"\nRadio Installation analysis saved to: output/Radio_Installation_Analysis.xlsx")
+        print(f"\nRadio Installation analysis saved to: {radio_output_path}")
         
         # Focus on ELEC OPERATIONS as requested
         if 'ELEC OPERATIONS' in radio_results:
@@ -527,7 +538,11 @@ def analyze_vehicle_replacement_by_lob_vehicle_class_and_object_type():
     """Analyze Vehicle Replacement by LOB, Vehicle Class (L.H.P), and ObjectType - detailed hierarchical structure"""
     
     # Read the data Excel file
-    df_data = pd.read_excel('data.xlsx')
+    data_file = get_input_file_safe("VEHICLE_FLEET_MASTER_DATA")
+    if data_file is None:
+        print("No vehicle fleet master data found. Returning empty results.")
+        return {}, {}
+    df_data = pd.read_excel(data_file)
     
     print("=== Detailed Vehicle Replacement Analysis by LOB, Vehicle Class, and ObjectType ===\n")
     
@@ -610,7 +625,11 @@ def analyze_vehicle_replacement_by_lhp_and_object_type():
     """Analyze Vehicle Replacement by L.H.P and ObjectType - across all LOBs"""
     
     # Read the data Excel file
-    df_data = pd.read_excel('data.xlsx')
+    data_file = get_input_file_safe("VEHICLE_FLEET_MASTER_DATA")
+    if data_file is None:
+        print("No vehicle fleet master data found. Returning empty results.")
+        return {}, {}
+    df_data = pd.read_excel(data_file)
     
     print("=== Vehicle Replacement Analysis by L.H.P and ObjectType ===\n")
     
@@ -686,7 +705,11 @@ def analyze_vehicle_replacement_by_object_type_only():
     """Analyze Vehicle Replacement by ObjectType only - across all LOBs and L.H.P categories"""
     
     # Read the data Excel file
-    df_data = pd.read_excel('data.xlsx')
+    data_file = get_input_file_safe("VEHICLE_FLEET_MASTER_DATA")
+    if data_file is None:
+        print("No vehicle fleet master data found. Returning empty results.")
+        return {}, {}
+    df_data = pd.read_excel(data_file)
     
     print("=== Vehicle Replacement Analysis by ObjectType Only ===\n")
     
@@ -747,7 +770,11 @@ def analyze_vehicle_replacement_by_lob_and_vehicle_class():
     """Analyze Vehicle Replacement by LOB and Vehicle Class (L.H.P) hierarchical structure"""
     
     # Read the data Excel file
-    df_data = pd.read_excel('data.xlsx')
+    data_file = get_input_file_safe("VEHICLE_FLEET_MASTER_DATA")
+    if data_file is None:
+        print("No vehicle fleet master data found. Returning empty results.")
+        return {}, {}
+    df_data = pd.read_excel(data_file)
     
     print("=== Vehicle Replacement Analysis by LOB and Vehicle Class ===\n")
     
@@ -909,12 +936,13 @@ def create_detailed_vehicle_replacement_hierarchical_pivot_table():
     detailed_hierarchical_pivot = pd.DataFrame(combined_data)
     
     # Save to Excel
-    os.makedirs('output', exist_ok=True)
+    ensure_database_directory()
     
-    with pd.ExcelWriter('output/Vehicle_Replacement_Detailed_Hierarchical.xlsx') as writer:
-        detailed_hierarchical_pivot.to_excel(writer, sheet_name='Detailed_Hierarchical_Summary', index=False)
+    detailed_output_path = get_output_file("VEHICLE_REPLACEMENT_DETAILED_FORECAST")
+    with pd.ExcelWriter(detailed_output_path) as writer:
+        detailed_hierarchical_pivot.to_excel(writer, sheet_name=get_sheet_name('DETAILED_HIERARCHICAL_SUMMARY'), index=False)
     
-    print(f"\nDetailed Hierarchical Vehicle Replacement analysis saved to: output/Vehicle_Replacement_Detailed_Hierarchical.xlsx")
+    print(f"\nDetailed Hierarchical Vehicle Replacement analysis saved to: {detailed_output_path}")
     
     # Display sample of detailed hierarchical structure
     print("\n=== 2026 DETAILED HIERARCHICAL SUMMARY SAMPLE ===")
@@ -1007,12 +1035,13 @@ def create_lhp_object_type_pivot_table():
     lhp_object_pivot = pd.DataFrame(combined_data)
     
     # Save to Excel
-    os.makedirs('output', exist_ok=True)
+    ensure_database_directory()
     
-    with pd.ExcelWriter('output/Vehicle_Replacement_LHP_ObjectType.xlsx') as writer:
-        lhp_object_pivot.to_excel(writer, sheet_name='LHP_ObjectType_Summary', index=False)
+    lhp_output_path = get_output_file("VEHICLE_REPLACEMENT_BY_CATEGORY")
+    with pd.ExcelWriter(lhp_output_path) as writer:
+        lhp_object_pivot.to_excel(writer, sheet_name=get_sheet_name('LHP_OBJECTTYPE_SUMMARY'), index=False)
     
-    print(f"\nL.H.P and ObjectType Vehicle Replacement analysis saved to: output/Vehicle_Replacement_LHP_ObjectType.xlsx")
+    print(f"\nL.H.P and ObjectType Vehicle Replacement analysis saved to: {lhp_output_path}")
     
     # Display sample of L.H.P -> ObjectType structure
     print("\n=== 2025-2026 L.H.P OBJECTTYPE SUMMARY SAMPLE ===")
@@ -1049,7 +1078,11 @@ def create_freightliner_analysis_data():
     EV_CHASSIS_COST = 300000   # $300,000 per EV vehicle
     
     # Read data to calculate H vehicle counts
-    df_data = pd.read_excel('data.xlsx')
+    data_file = get_input_file_safe("VEHICLE_FLEET_MASTER_DATA")
+    if data_file is None:
+        print("No vehicle fleet master data found. Returning empty results.")
+        return {}, {}
+    df_data = pd.read_excel(data_file)
     
     # Define years for analysis
     years = list(range(2026, 2036))  # 2026-2035
@@ -1224,7 +1257,11 @@ def create_freightliner_analysis():
     EV_CHASSIS_COST = 300000   # $300,000 per EV vehicle
     
     # Read data to calculate H vehicle count
-    df_data = pd.read_excel('data.xlsx')
+    data_file = get_input_file_safe("VEHICLE_FLEET_MASTER_DATA")
+    if data_file is None:
+        print("No vehicle fleet master data found. Returning empty results.")
+        return {}, {}
+    df_data = pd.read_excel(data_file)
     
     # Define years for analysis
     years = list(range(2026, 2036))  # 2026-2035
@@ -1386,17 +1423,17 @@ def create_freightliner_analysis():
     freightliner_df = pd.DataFrame(freightliner_data)
     
     # Create output directory if it doesn't exist
-    os.makedirs('output', exist_ok=True)
+    ensure_database_directory()
     
     # Save the Freightliner analysis to Excel
-    output_path = 'output/Freightliner_EV_Analysis.xlsx'
+    output_path = get_output_file("HEAVY_VEHICLE_EV_TRANSITION_ANALYSIS")
     
     with pd.ExcelWriter(output_path, engine='openpyxl') as writer:
         # Save main analysis
-        freightliner_df.to_excel(writer, sheet_name='Freightliner_Analysis', index=False)
+        freightliner_df.to_excel(writer, sheet_name=get_sheet_name('FREIGHTLINER_ANALYSIS'), index=False)
     
     print(f"\nFreightliner EV Analysis saved to: {output_path}")
-    print("Sheet created: Freightliner_Analysis")
+    print(f"Sheet created: {get_sheet_name('FREIGHTLINER_ANALYSIS')}")
     print("✅ Dedicated Freightliner analysis with detailed EV scenarios:")
     print("  - Freightliner baseline analysis")
     print("  - 100% ICE Vehicle budget calculations")
@@ -1454,7 +1491,11 @@ def create_van_ev_analysis_data():
     EV_CHASSIS_COST_VAN = 55000    # $55,000 per EV Van (cheaper than ICE!)
     
     # Read data to calculate L Van counts
-    df_data = pd.read_excel('data.xlsx')
+    data_file = get_input_file_safe("VEHICLE_FLEET_MASTER_DATA")
+    if data_file is None:
+        print("No vehicle fleet master data found. Returning empty results.")
+        return {}, {}
+    df_data = pd.read_excel(data_file)
     
     # Define years for analysis
     years = list(range(2026, 2036))  # 2026-2035
@@ -1624,7 +1665,11 @@ def create_van_ev_analysis():
     EV_CHASSIS_COST_VAN = 55000    # $55,000 per EV Van (cheaper than ICE!)
     
     # Read data to calculate L Van counts
-    df_data = pd.read_excel('data.xlsx')
+    data_file = get_input_file_safe("VEHICLE_FLEET_MASTER_DATA")
+    if data_file is None:
+        print("No vehicle fleet master data found. Returning empty results.")
+        return {}, {}
+    df_data = pd.read_excel(data_file)
     
     # Define years for analysis
     years = list(range(2026, 2036))  # 2026-2035
@@ -1784,15 +1829,15 @@ def create_van_ev_analysis():
     van_df = pd.DataFrame(van_data)
     
     # Ensure output directory exists
-    os.makedirs('output', exist_ok=True)
+    ensure_database_directory()
     
     # Save to Excel
-    output_path = 'output/Van_EV_Analysis.xlsx'
+    output_path = get_output_file("LIGHT_VAN_EV_TRANSITION_ANALYSIS")
     with pd.ExcelWriter(output_path, engine='openpyxl') as writer:
-        van_df.to_excel(writer, sheet_name='Van_Analysis', index=False)
+        van_df.to_excel(writer, sheet_name=get_sheet_name('VAN_ANALYSIS'), index=False)
     
     print(f"\nVan EV Analysis saved to: {output_path}")
-    print("Sheet created: Van_Analysis")
+    print(f"Sheet created: {get_sheet_name('VAN_ANALYSIS')}")
     print("✅ Dedicated Light Van analysis with detailed EV scenarios:")
     print("  - Van baseline analysis")
     print("  - 100% ICE Van budget calculations")
@@ -1835,7 +1880,11 @@ def create_car_suv_ev_analysis_data():
     EV_CHASSIS_COST_CAR = 46000    # $46,000 per EV Car/SUV (more expensive than ICE)
     
     # Read data to calculate L Car/SUV counts
-    df_data = pd.read_excel('data.xlsx')
+    data_file = get_input_file_safe("VEHICLE_FLEET_MASTER_DATA")
+    if data_file is None:
+        print("No vehicle fleet master data found. Returning empty results.")
+        return {}, {}
+    df_data = pd.read_excel(data_file)
     
     # Define years for analysis
     years = list(range(2026, 2036))  # 2026-2035
@@ -2005,7 +2054,11 @@ def create_car_suv_ev_analysis():
     EV_CHASSIS_COST_CAR = 46000    # $46,000 per EV Car/SUV (more expensive than ICE)
     
     # Read data to calculate L Car/SUV counts
-    df_data = pd.read_excel('data.xlsx')
+    data_file = get_input_file_safe("VEHICLE_FLEET_MASTER_DATA")
+    if data_file is None:
+        print("No vehicle fleet master data found. Returning empty results.")
+        return {}, {}
+    df_data = pd.read_excel(data_file)
     
     # Define years for analysis
     years = list(range(2026, 2036))  # 2026-2035
@@ -2165,7 +2218,7 @@ def create_car_suv_ev_analysis():
     car_suv_df = pd.DataFrame(car_suv_data)
     
     # Ensure output directory exists
-    os.makedirs('output', exist_ok=True)
+    ensure_database_directory()
     
     # Save to Excel
     output_path = 'output/Car_SUV_EV_Analysis.xlsx'
@@ -2216,7 +2269,11 @@ def create_pickup_ev_analysis_data():
     EV_CHASSIS_COST_PICKUP = 54000    # $54,000 per EV Pickup (more expensive than ICE)
     
     # Read data to calculate L Pickup counts
-    df_data = pd.read_excel('data.xlsx')
+    data_file = get_input_file_safe("VEHICLE_FLEET_MASTER_DATA")
+    if data_file is None:
+        print("No vehicle fleet master data found. Returning empty results.")
+        return {}, {}
+    df_data = pd.read_excel(data_file)
     
     # Define years for analysis
     years = list(range(2026, 2036))  # 2026-2035
@@ -2386,7 +2443,11 @@ def create_pickup_ev_analysis():
     EV_CHASSIS_COST_PICKUP = 54000    # $54,000 per EV Pickup (more expensive than ICE)
     
     # Read data to calculate L Pickup counts
-    df_data = pd.read_excel('data.xlsx')
+    data_file = get_input_file_safe("VEHICLE_FLEET_MASTER_DATA")
+    if data_file is None:
+        print("No vehicle fleet master data found. Returning empty results.")
+        return {}, {}
+    df_data = pd.read_excel(data_file)
     
     # Define years for analysis
     years = list(range(2026, 2036))  # 2026-2035
@@ -2546,7 +2607,7 @@ def create_pickup_ev_analysis():
     pickup_df = pd.DataFrame(pickup_data)
     
     # Ensure output directory exists
-    os.makedirs('output', exist_ok=True)
+    ensure_database_directory()
     
     # Save to Excel
     output_path = 'output/Pickup_EV_Analysis.xlsx'
@@ -2631,7 +2692,7 @@ def create_object_type_only_pivot_table():
     object_type_pivot = pd.DataFrame(combined_data)
     
     # Save to Excel
-    os.makedirs('output', exist_ok=True)
+    ensure_database_directory()
     
     with pd.ExcelWriter('output/Vehicle_Replacement_ObjectType_Only.xlsx') as writer:
         object_type_pivot.to_excel(writer, sheet_name='ObjectType_Summary', index=False)
@@ -2724,7 +2785,7 @@ def create_vehicle_replacement_hierarchical_pivot_table():
     hierarchical_pivot = pd.DataFrame(combined_data)
     
     # Save to Excel
-    os.makedirs('output', exist_ok=True)
+    ensure_database_directory()
     
     with pd.ExcelWriter('output/Vehicle_Replacement_Hierarchical.xlsx') as writer:
         hierarchical_pivot.to_excel(writer, sheet_name='Hierarchical_Summary', index=False)

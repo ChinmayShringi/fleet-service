@@ -6,11 +6,15 @@ with their corresponding lifecycle information from OOL.xlsx.
 """
 
 from ool_reader import create_lob_lifecycle_pivot
+from constants.file_constants import ensure_database_directory
 
 def main():
     """Generate LOB pivot table"""
     print("LOB Equipment Lifecycle Pivot Table Generator")
     print("=" * 60)
+    
+    # Ensure database directory exists
+    ensure_database_directory()
     
     # Generate the pivot table
     pivot_data = create_lob_lifecycle_pivot()
