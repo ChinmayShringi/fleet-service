@@ -352,39 +352,39 @@ export const FleetPage: React.FC = () => {
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
               <Filter className="w-4 h-4 text-muted-foreground" />
-              <Select value={selectedFilters.make} onValueChange={(value) => 
-                setSelectedFilters(prev => ({ ...prev, make: value }))}>
+              <Select value={selectedFilters.make || 'all'} onValueChange={(value) => 
+                setSelectedFilters(prev => ({ ...prev, make: value === 'all' ? '' : value }))}>
                 <SelectTrigger className="w-32">
                   <SelectValue placeholder="Make" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Makes</SelectItem>
+                  <SelectItem value="all">All Makes</SelectItem>
                   {uniqueValues.makes.map(make => (
                     <SelectItem key={make} value={make}>{make}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
               
-              <Select value={selectedFilters.year} onValueChange={(value) => 
-                setSelectedFilters(prev => ({ ...prev, year: value }))}>
+              <Select value={selectedFilters.year || 'all'} onValueChange={(value) => 
+                setSelectedFilters(prev => ({ ...prev, year: value === 'all' ? '' : value }))}>
                 <SelectTrigger className="w-32">
                   <SelectValue placeholder="Year" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Years</SelectItem>
+                  <SelectItem value="all">All Years</SelectItem>
                   {uniqueValues.years.map(year => (
                     <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
               
-              <Select value={selectedFilters.location} onValueChange={(value) => 
-                setSelectedFilters(prev => ({ ...prev, location: value }))}>
+              <Select value={selectedFilters.location || 'all'} onValueChange={(value) => 
+                setSelectedFilters(prev => ({ ...prev, location: value === 'all' ? '' : value }))}>
                 <SelectTrigger className="w-32">
                   <SelectValue placeholder="Location" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Locations</SelectItem>
+                  <SelectItem value="all">All Locations</SelectItem>
                   {uniqueValues.locations.map(location => (
                     <SelectItem key={location} value={location}>{location}</SelectItem>
                   ))}
