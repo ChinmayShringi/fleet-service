@@ -3,16 +3,21 @@ Script Controller
 Handles HTTP requests for running utility scripts
 """
 
-from flask import jsonify
+from flask import jsonify, request
 from services.script_service import ScriptService
 
 class ScriptController:
     
     @staticmethod
     def run_excel_reader():
-        """Run excel reader to generate pivot tables"""
+        """Run excel reader to generate pivot tables with optional cost parameters"""
         try:
-            result = ScriptService.run_excel_reader()
+            # Get cost parameters from request body (if any)
+            cost_parameters = {}
+            if request.is_json and request.json:
+                cost_parameters = request.json.get('costParameters', {})
+            
+            result = ScriptService.run_excel_reader(cost_parameters)
             
             if result['success']:
                 return jsonify(result), 200

@@ -1,7 +1,47 @@
 import pandas as pd
 import shutil
 import os
+import argparse
 from constants.file_constants import get_input_file_safe, get_output_file, get_sheet_name, ensure_database_directory
+
+def parse_arguments():
+    """Parse command line arguments for cost parameters"""
+    parser = argparse.ArgumentParser(description='Excel Reader with configurable cost parameters')
+    
+    # EV Ratios
+    parser.add_argument('--freightliner-ev-ratio', type=int, default=7,
+                       help='Heavy EV ratio total (default: 7 for 6 ICE : 1 EV)')
+    parser.add_argument('--light-ev-ratio', type=int, default=4,
+                       help='Light EV ratio total (default: 4 for 3 ICE : 1 EV)')
+    
+    # Heavy Vehicle Costs
+    parser.add_argument('--ice-chassis-heavy', type=float, default=125000,
+                       help='ICE Heavy chassis cost (default: 125000)')
+    parser.add_argument('--ev-chassis-heavy', type=float, default=300000,
+                       help='EV Heavy chassis cost (default: 300000)')
+    
+    # Van Costs
+    parser.add_argument('--ice-chassis-van', type=float, default=62000,
+                       help='ICE Van chassis cost (default: 62000)')
+    parser.add_argument('--ev-chassis-van', type=float, default=55000,
+                       help='EV Van chassis cost (default: 55000)')
+    
+    # Car/SUV Costs
+    parser.add_argument('--ice-chassis-car', type=float, default=43000,
+                       help='ICE Car/SUV chassis cost (default: 43000)')
+    parser.add_argument('--ev-chassis-car', type=float, default=46000,
+                       help='EV Car/SUV chassis cost (default: 46000)')
+    
+    # Pickup Costs
+    parser.add_argument('--ice-chassis-pickup', type=float, default=44000,
+                       help='ICE Pickup chassis cost (default: 44000)')
+    parser.add_argument('--ev-chassis-pickup', type=float, default=54000,
+                       help='EV Pickup chassis cost (default: 54000)')
+    
+    return parser.parse_args()
+
+# Parse command line arguments
+args = parse_arguments()
 
 def calculate_vehicle_data():
     """Calculate vehicle counts and replacement costs for H, L, P categories from data.xlsx for years 2026-2035"""
@@ -1070,12 +1110,17 @@ def create_freightliner_analysis_data():
     print("\n" + "="*60)
     print("=== Creating Freightliner EV Analysis Data ===")
     
-    # EV RATIO CONSTANTS - Change these values in one place
-    FREIGHTLINER_EV_RATIO_TOTAL = 7  # 6 ICE : 1 EV = 7 total vehicles
+    # EV RATIO CONSTANTS - Using command line arguments or defaults
+    FREIGHTLINER_EV_RATIO_TOTAL = args.freightliner_ev_ratio  # From command line or default 7
     
-    # CHASSIS COST VARIABLES - Change these values in one place
-    ICE_CHASSIS_COST = 125000  # $125,000 per ICE vehicle
-    EV_CHASSIS_COST = 300000   # $300,000 per EV vehicle
+    # CHASSIS COST VARIABLES - Using command line arguments or defaults  
+    ICE_CHASSIS_COST = args.ice_chassis_heavy  # From command line or default 125000
+    EV_CHASSIS_COST = args.ev_chassis_heavy   # From command line or default 300000
+    
+    print(f"Using Heavy Vehicle Parameters:")
+    print(f"  EV Ratio Total: {FREIGHTLINER_EV_RATIO_TOTAL}")
+    print(f"  ICE Chassis Cost: ${ICE_CHASSIS_COST:,.0f}")
+    print(f"  EV Chassis Cost: ${EV_CHASSIS_COST:,.0f}")
     
     # Read data to calculate H vehicle counts
     data_file = get_input_file_safe("VEHICLE_FLEET_MASTER_DATA")
@@ -1252,9 +1297,9 @@ def create_freightliner_analysis():
     print("\n" + "="*60)
     print("=== Creating Freightliner EV Analysis ===")
     
-    # CHASSIS COST VARIABLES - Change these values in one place
-    ICE_CHASSIS_COST = 125000  # $125,000 per ICE vehicle
-    EV_CHASSIS_COST = 300000   # $300,000 per EV vehicle
+    # CHASSIS COST VARIABLES - Using command line arguments or defaults
+    ICE_CHASSIS_COST = args.ice_chassis_heavy  # From command line or default 125000
+    EV_CHASSIS_COST = args.ev_chassis_heavy   # From command line or default 300000
     
     # Read data to calculate H vehicle count
     data_file = get_input_file_safe("VEHICLE_FLEET_MASTER_DATA")
@@ -1483,12 +1528,17 @@ def create_van_ev_analysis_data():
     print("\n" + "="*60)
     print("=== Creating Light Van EV Analysis Data ===")
     
-    # EV RATIO CONSTANTS - Change these values in one place
-    LIGHT_EV_RATIO_TOTAL = 4  # 3 ICE : 1 EV = 4 total vehicles
+    # EV RATIO CONSTANTS - Using command line arguments or defaults
+    LIGHT_EV_RATIO_TOTAL = args.light_ev_ratio  # From command line or default 4
     
-    # VAN CHASSIS COST VARIABLES - Change these values in one place
-    ICE_CHASSIS_COST_VAN = 62000   # $62,000 per ICE Van
-    EV_CHASSIS_COST_VAN = 55000    # $55,000 per EV Van (cheaper than ICE!)
+    # VAN CHASSIS COST VARIABLES - Using command line arguments or defaults
+    ICE_CHASSIS_COST_VAN = args.ice_chassis_van   # From command line or default 62000
+    EV_CHASSIS_COST_VAN = args.ev_chassis_van    # From command line or default 55000
+    
+    print(f"Using Van Parameters:")
+    print(f"  Light EV Ratio Total: {LIGHT_EV_RATIO_TOTAL}")
+    print(f"  ICE Van Chassis Cost: ${ICE_CHASSIS_COST_VAN:,.0f}")
+    print(f"  EV Van Chassis Cost: ${EV_CHASSIS_COST_VAN:,.0f}")
     
     # Read data to calculate L Van counts
     data_file = get_input_file_safe("VEHICLE_FLEET_MASTER_DATA")
@@ -1660,9 +1710,9 @@ def create_van_ev_analysis():
     print("\n" + "="*60)
     print("=== Creating Light Van EV Analysis ===")
     
-    # VAN CHASSIS COST VARIABLES - Change these values in one place
-    ICE_CHASSIS_COST_VAN = 62000   # $62,000 per ICE Van
-    EV_CHASSIS_COST_VAN = 55000    # $55,000 per EV Van (cheaper than ICE!)
+    # VAN CHASSIS COST VARIABLES - Using command line arguments or defaults
+    ICE_CHASSIS_COST_VAN = args.ice_chassis_van   # From command line or default 62000
+    EV_CHASSIS_COST_VAN = args.ev_chassis_van    # From command line or default 55000
     
     # Read data to calculate L Van counts
     data_file = get_input_file_safe("VEHICLE_FLEET_MASTER_DATA")
@@ -1872,12 +1922,17 @@ def create_car_suv_ev_analysis_data():
     print("\n" + "="*60)
     print("=== Creating Light Car/SUV EV Analysis Data ===")
     
-    # EV RATIO CONSTANTS - Change these values in one place
-    LIGHT_EV_RATIO_TOTAL = 4  # 3 ICE : 1 EV = 4 total vehicles
+    # EV RATIO CONSTANTS - Using command line arguments or defaults
+    LIGHT_EV_RATIO_TOTAL = args.light_ev_ratio  # From command line or default 4
     
-    # CAR/SUV CHASSIS COST VARIABLES - Change these values in one place
-    ICE_CHASSIS_COST_CAR = 43000   # $43,000 per ICE Car/SUV
-    EV_CHASSIS_COST_CAR = 46000    # $46,000 per EV Car/SUV (more expensive than ICE)
+    # CAR/SUV CHASSIS COST VARIABLES - Using command line arguments or defaults
+    ICE_CHASSIS_COST_CAR = args.ice_chassis_car   # From command line or default 43000
+    EV_CHASSIS_COST_CAR = args.ev_chassis_car    # From command line or default 46000
+    
+    print(f"Using Car/SUV Parameters:")
+    print(f"  Light EV Ratio Total: {LIGHT_EV_RATIO_TOTAL}")
+    print(f"  ICE Car/SUV Chassis Cost: ${ICE_CHASSIS_COST_CAR:,.0f}")
+    print(f"  EV Car/SUV Chassis Cost: ${EV_CHASSIS_COST_CAR:,.0f}")
     
     # Read data to calculate L Car/SUV counts
     data_file = get_input_file_safe("VEHICLE_FLEET_MASTER_DATA")
@@ -2049,9 +2104,9 @@ def create_car_suv_ev_analysis():
     print("\n" + "="*60)
     print("=== Creating Light Car/SUV EV Analysis ===")
     
-    # CAR/SUV CHASSIS COST VARIABLES - Change these values in one place
-    ICE_CHASSIS_COST_CAR = 43000   # $43,000 per ICE Car/SUV
-    EV_CHASSIS_COST_CAR = 46000    # $46,000 per EV Car/SUV (more expensive than ICE)
+    # CAR/SUV CHASSIS COST VARIABLES - Using command line arguments or defaults
+    ICE_CHASSIS_COST_CAR = args.ice_chassis_car   # From command line or default 43000
+    EV_CHASSIS_COST_CAR = args.ev_chassis_car    # From command line or default 46000
     
     # Read data to calculate L Car/SUV counts
     data_file = get_input_file_safe("VEHICLE_FLEET_MASTER_DATA")
@@ -2261,12 +2316,17 @@ def create_pickup_ev_analysis_data():
     print("\n" + "="*60)
     print("=== Creating Light Pickup EV Analysis Data ===")
     
-    # EV RATIO CONSTANTS - Change these values in one place
-    LIGHT_EV_RATIO_TOTAL = 4  # 3 ICE : 1 EV = 4 total vehicles
+    # EV RATIO CONSTANTS - Using command line arguments or defaults
+    LIGHT_EV_RATIO_TOTAL = args.light_ev_ratio  # From command line or default 4
     
-    # PICKUP CHASSIS COST VARIABLES - Change these values in one place
-    ICE_CHASSIS_COST_PICKUP = 44000   # $44,000 per ICE Pickup
-    EV_CHASSIS_COST_PICKUP = 54000    # $54,000 per EV Pickup (more expensive than ICE)
+    # PICKUP CHASSIS COST VARIABLES - Using command line arguments or defaults
+    ICE_CHASSIS_COST_PICKUP = args.ice_chassis_pickup   # From command line or default 44000
+    EV_CHASSIS_COST_PICKUP = args.ev_chassis_pickup    # From command line or default 54000
+    
+    print(f"Using Pickup Parameters:")
+    print(f"  Light EV Ratio Total: {LIGHT_EV_RATIO_TOTAL}")
+    print(f"  ICE Pickup Chassis Cost: ${ICE_CHASSIS_COST_PICKUP:,.0f}")
+    print(f"  EV Pickup Chassis Cost: ${EV_CHASSIS_COST_PICKUP:,.0f}")
     
     # Read data to calculate L Pickup counts
     data_file = get_input_file_safe("VEHICLE_FLEET_MASTER_DATA")
@@ -2438,9 +2498,9 @@ def create_pickup_ev_analysis():
     print("\n" + "="*60)
     print("=== Creating Light Pickup EV Analysis ===")
     
-    # PICKUP CHASSIS COST VARIABLES - Change these values in one place
-    ICE_CHASSIS_COST_PICKUP = 44000   # $44,000 per ICE Pickup
-    EV_CHASSIS_COST_PICKUP = 54000    # $54,000 per EV Pickup (more expensive than ICE)
+    # PICKUP CHASSIS COST VARIABLES - Using command line arguments or defaults
+    ICE_CHASSIS_COST_PICKUP = args.ice_chassis_pickup   # From command line or default 44000
+    EV_CHASSIS_COST_PICKUP = args.ev_chassis_pickup    # From command line or default 54000
     
     # Read data to calculate L Pickup counts
     data_file = get_input_file_safe("VEHICLE_FLEET_MASTER_DATA")

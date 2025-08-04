@@ -75,7 +75,11 @@ export const ReportsPage: React.FC = () => {
       
       switch (reportId) {
         case 'excel-analysis':
-          response = await apiService.runExcelAnalysis();
+          // Get cost parameters from localStorage if available
+          const savedParameters = localStorage.getItem('pseg_cost_parameters');
+          const costParameters = savedParameters ? JSON.parse(savedParameters) : null;
+          console.log('Using cost parameters for Excel analysis:', costParameters);
+          response = await apiService.runExcelAnalysis(costParameters);
           break;
         case 'lob-pivot':
           response = await apiService.runLOBPivotGenerator();

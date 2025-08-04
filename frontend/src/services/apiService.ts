@@ -142,9 +142,10 @@ class ApiService {
   }
 
   // Script Execution
-  async runExcelAnalysis() {
+  async runExcelAnalysis(costParameters?: any) {
     return this.request<ScriptResponse>('/api/scripts/excel-reader/run', {
       method: 'POST',
+      body: costParameters ? JSON.stringify({ costParameters }) : undefined,
     });
   }
 

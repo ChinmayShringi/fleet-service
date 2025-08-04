@@ -16,17 +16,53 @@ from constants.file_constants import (
 class ScriptService:
     
     @staticmethod
-    def run_excel_reader():
-        """Run excel_reader script to generate pivot tables"""
+    def run_excel_reader(cost_parameters=None):
+        """Run excel_reader script to generate pivot tables with optional cost parameters"""
         try:
             script_path = EXCEL_READER_SCRIPT
+            
+            # Build command with cost parameters if provided
+            command = [sys.executable, script_path]
+            
+            if cost_parameters:
+                # Add cost parameters as command line arguments
+                if 'freightlinerEvRatioTotal' in cost_parameters:
+                    command.extend(['--freightliner-ev-ratio', str(cost_parameters['freightlinerEvRatioTotal'])])
+                if 'lightEvRatioTotal' in cost_parameters:
+                    command.extend(['--light-ev-ratio', str(cost_parameters['lightEvRatioTotal'])])
+                    
+                # Heavy vehicle costs
+                if 'iceChassisHeavy' in cost_parameters:
+                    command.extend(['--ice-chassis-heavy', str(cost_parameters['iceChassisHeavy'])])
+                if 'evChassisHeavy' in cost_parameters:
+                    command.extend(['--ev-chassis-heavy', str(cost_parameters['evChassisHeavy'])])
+                    
+                # Van costs
+                if 'iceChassisVan' in cost_parameters:
+                    command.extend(['--ice-chassis-van', str(cost_parameters['iceChassisVan'])])
+                if 'evChassisVan' in cost_parameters:
+                    command.extend(['--ev-chassis-van', str(cost_parameters['evChassisVan'])])
+                    
+                # Car/SUV costs
+                if 'iceChassisCar' in cost_parameters:
+                    command.extend(['--ice-chassis-car', str(cost_parameters['iceChassisCar'])])
+                if 'evChassisCar' in cost_parameters:
+                    command.extend(['--ev-chassis-car', str(cost_parameters['evChassisCar'])])
+                    
+                # Pickup costs
+                if 'iceChassisPickup' in cost_parameters:
+                    command.extend(['--ice-chassis-pickup', str(cost_parameters['iceChassisPickup'])])
+                if 'evChassisPickup' in cost_parameters:
+                    command.extend(['--ev-chassis-pickup', str(cost_parameters['evChassisPickup'])])
             
             # Run the script with proper Python path
             env = os.environ.copy()
             env['PYTHONPATH'] = os.getcwd()  # Add current directory to Python path
             
+            print(f"Running excel_reader with command: {' '.join(command)}")  # Debug log
+            
             result = subprocess.run(
-                [sys.executable, script_path],
+                command,
                 capture_output=True,
                 text=True,
                 timeout=300,  # 5 minute timeout
@@ -37,7 +73,8 @@ class ScriptService:
                 return {
                     'success': True,
                     'message': 'Excel reader completed successfully',
-                    'output': result.stdout
+                    'output': result.stdout,
+                    'parameters_used': cost_parameters or {}
                 }
             else:
                 return {
