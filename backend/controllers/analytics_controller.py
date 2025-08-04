@@ -240,30 +240,22 @@ def get_quick_stats():
         
         dashboard = dashboard_summary['dashboard']
         
-        # Get vehicle analytics for more detailed stats
-        vehicle_result = get_vehicle_analytics()
-        vehicle_data = vehicle_result.get_json() if hasattr(vehicle_result, 'get_json') else {}
-        
+        # Use only cached dashboard data for performance - no expensive analytics calls
         quick_stats = {
-            'total_files': dashboard['total_files'],
-            'total_records': dashboard['total_records'],
-            'total_vehicles': dashboard['total_vehicles'],
-            'total_equipment': dashboard['total_equipment'],
-            'total_value': dashboard['total_value'],
-            'total_value_formatted': f"${dashboard['total_value']:,.0f}",
-            'total_value_millions': f"${dashboard['total_value'] / 1_000_000:.1f}M" if dashboard['total_value'] > 0 else "$0.0M"
+            'total_files': dashboard.get('total_files', 0),
+            'total_records': dashboard.get('total_records', 0),
+            'total_vehicles': dashboard.get('total_vehicles', 0),
+            'total_equipment': dashboard.get('total_equipment', 0),
+            'total_value': dashboard.get('total_value', 0),
+            'total_value_formatted': f"${dashboard.get('total_value', 0):,.0f}",
+            'total_value_millions': f"${dashboard.get('total_value', 0) / 1_000_000:.1f}M" if dashboard.get('total_value', 0) > 0 else "$0.0M",
+            # Default values for additional stats - can be improved later by including in cache
+            'avg_cost': 0,
+            'avg_cost_formatted': '$0',
+            'avg_year': 0,
+            'unique_makes': 0,
+            'unique_locations': 0
         }
-        
-        # Add vehicle-specific quick stats if available
-        if vehicle_data.get('success') and 'analytics' in vehicle_data:
-            vehicle_analytics = vehicle_data['analytics']
-            quick_stats.update({
-                'avg_cost': vehicle_analytics.get('avg_cost', 0),
-                'avg_cost_formatted': vehicle_analytics.get('avg_cost_formatted', '$0'),
-                'avg_year': int(vehicle_analytics.get('avg_year', 0)),
-                'unique_makes': vehicle_analytics.get('unique_makes', 0),
-                'unique_locations': vehicle_analytics.get('unique_locations', 0)
-            })
         
         return jsonify({
             'success': True,

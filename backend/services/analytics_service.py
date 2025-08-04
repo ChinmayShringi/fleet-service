@@ -5,6 +5,7 @@ Provides data for dashboard charts, widgets, and analytics.
 
 import pandas as pd
 import numpy as np
+import json
 from datetime import datetime
 from typing import Dict, List, Any, Optional
 import os
@@ -18,80 +19,44 @@ class AnalyticsService:
         self.cache_file = get_output_file("ANALYTICS_SUMMARY")
     
     def _load_cached_analytics(self) -> Optional[Dict[str, Any]]:
-        """Load analytics from cache file if it exists"""
+        """Load analytics from JSON cache file if it exists - much faster than Excel"""
         try:
             if not os.path.exists(self.cache_file):
                 print(f"Analytics cache file not found: {self.cache_file}")
                 return None
                 
-            print(f"Loading analytics from cache: {self.cache_file}")
+            print(f"Loading analytics from JSON cache: {self.cache_file}")
             
-            # Read the cached data from Excel
-            with pd.ExcelFile(self.cache_file) as excel_file:
-                sheet_names = excel_file.sheet_names
+            # Read the cached data from JSON - much faster than Excel
+            with open(self.cache_file, 'r') as f:
+                cached_data = json.load(f)
                 
-                cached_data = {}
-                
-                # Load file summaries if available
-                if 'file_summaries' in sheet_names:
-                    summaries_df = pd.read_excel(excel_file, sheet_name='file_summaries')
-                    cached_data['file_summaries'] = summaries_df.to_dict('records')
-                
-                # Load quick stats if available
-                if 'quick_stats' in sheet_names:
-                    quick_stats_df = pd.read_excel(excel_file, sheet_name='quick_stats')
-                    if not quick_stats_df.empty:
-                        cached_data['quick_stats'] = quick_stats_df.iloc[0].to_dict()
-                
-                # Load global summary if available
-                if 'global_summary' in sheet_names:
-                    global_summary_df = pd.read_excel(excel_file, sheet_name='global_summary')
-                    if not global_summary_df.empty:
-                        cached_data['global_summary'] = global_summary_df.iloc[0].to_dict()
-                
-                return cached_data
+            print(f"Successfully loaded cached analytics data")
+            return cached_data
                 
         except Exception as e:
             print(f"Error loading cached analytics: {str(e)}")
             return None
     
     def _save_analytics_to_cache(self, file_summaries: Dict, quick_stats: Dict, global_summary: Dict):
-        """Save analytics data to cache file"""
+        """Save analytics data to JSON cache file - much faster than Excel"""
         try:
-            print(f"Saving analytics to cache: {self.cache_file}")
+            print(f"Saving analytics to JSON cache: {self.cache_file}")
             
-            with pd.ExcelWriter(self.cache_file, engine='openpyxl') as writer:
-                # Save file summaries
-                if file_summaries and 'summaries' in file_summaries:
-                    summaries_data = []
-                    for file_key, data in file_summaries['summaries'].items():
-                        summary_row = {
-                            'file_key': file_key,
-                            'filename': data.get('filename', ''),
-                            'summary_json': str(data.get('summary', {}))
-                        }
-                        summaries_data.append(summary_row)
-                    
-                    summaries_df = pd.DataFrame(summaries_data)
-                    summaries_df.to_excel(writer, sheet_name='file_summaries', index=False)
-                
-                # Save quick stats
-                if quick_stats:
-                    quick_stats_df = pd.DataFrame([quick_stats])
-                    quick_stats_df.to_excel(writer, sheet_name='quick_stats', index=False)
-                
-                # Save global summary
-                if global_summary:
-                    global_summary_df = pd.DataFrame([global_summary])
-                    global_summary_df.to_excel(writer, sheet_name='global_summary', index=False)
-                
-                # Add metadata
-                metadata = {
+            # Create cache data structure
+            cache_data = {
+                'file_summaries': file_summaries,
+                'quick_stats': quick_stats,
+                'global_summary': global_summary,
+                'metadata': {
                     'generated_at': datetime.now().isoformat(),
-                    'cache_version': '1.0'
+                    'cache_version': '2.0'
                 }
-                metadata_df = pd.DataFrame([metadata])
-                metadata_df.to_excel(writer, sheet_name='metadata', index=False)
+            }
+            
+            # Save to JSON file - much faster than Excel
+            with open(self.cache_file, 'w') as f:
+                json.dump(cache_data, f, indent=2, default=str)
             
             print(f"Analytics cache saved successfully to {self.cache_file}")
             
