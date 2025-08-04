@@ -9,7 +9,12 @@ import {
   BarChart3,
   Settings,
   Upload,
-  Sun
+  Sun,
+  Database,
+  Zap,
+  Radio,
+  TrendingUp,
+  Calendar
 } from 'lucide-react';
 import {
   Sidebar,
@@ -33,6 +38,14 @@ const navigationItems = [
   { title: 'Settings', url: '/settings', icon: Settings },
 ];
 
+const excelDataItems = [
+  { title: 'Vehicle Fleet Data', url: '/vehicle-fleet-data', icon: Truck },
+  { title: 'Electric Vehicle Budget', url: '/electric-vehicle-budget', icon: Zap },
+  { title: 'Radio Equipment Cost', url: '/radio-equipment-cost', icon: Radio },
+  { title: 'Equipment Lifecycle', url: '/excel-data/equipment_lifecycle_reference', icon: Calendar },
+  { title: 'Vehicle Replacement', url: '/excel-data/vehicle_replacement_detailed_forecast', icon: TrendingUp },
+];
+
 export const AppSidebar: React.FC = () => {
   const { state } = useSidebar();
   const { hasRole, user } = useAuth();
@@ -42,25 +55,13 @@ export const AppSidebar: React.FC = () => {
 
   const isActive = (path: string) => currentPath === path || (path === '/dashboard' && currentPath === '/');
 
-  // Debug: Log user info to help troubleshoot
-  console.log('AppSidebar - Current user:', user);
-  console.log('AppSidebar - hasRole("Admin"):', hasRole('Admin'));
-  console.log('AppSidebar - user?.role:', user?.role);
-
   // Filter navigation items based on user role
   const filteredNavigationItems = navigationItems.filter(item => {
     if (item.title === 'Users') {
-      const isAdmin = hasRole('Admin');
-      console.log('AppSidebar - Filtering Users item, isAdmin:', isAdmin);
-      // Also try case-insensitive check as fallback
-      const isAdminCaseInsensitive = user?.role?.toLowerCase() === 'admin';
-      console.log('AppSidebar - Case insensitive admin check:', isAdminCaseInsensitive);
-      return isAdmin || isAdminCaseInsensitive; // Only show Users to Admin
+      return hasRole('Admin'); // Only show Users to Admin
     }
     return true;
   });
-
-  console.log('AppSidebar - Filtered navigation items:', filteredNavigationItems.map(i => i.title));
 
   return (
     <Sidebar className={collapsed ? 'w-14' : 'w-64'} collapsible="icon">
@@ -86,6 +87,49 @@ export const AppSidebar: React.FC = () => {
           <SidebarGroupContent>
             <SidebarMenu className="space-y-1 px-2">
               {filteredNavigationItems.map((item) => {
+                const active = isActive(item.url);
+                return (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton 
+                      asChild 
+                      className={`w-full transition-all duration-200 ${
+                        active 
+                          ? 'bg-primary text-primary-foreground shadow-sm font-medium' 
+                          : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
+                      }`}
+                    >
+                      <NavLink
+                        to={item.url}
+                        className="flex items-center space-x-3 px-3 py-2.5 rounded-lg no-underline"
+                      >
+                        <item.icon className={`w-4 h-4 flex-shrink-0 ${
+                          active ? 'text-primary-foreground' : 'text-inherit'
+                        }`} />
+                        {!collapsed && (
+                          <span className={`text-sm ${
+                            active ? 'text-primary-foreground font-medium' : 'text-inherit'
+                          }`}>
+                            {item.title}
+                          </span>
+                        )}
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        
+        {/* Excel Data Section */}
+        <SidebarGroup>
+          <SidebarGroupLabel className="text-muted-foreground font-medium px-3 mb-2 flex items-center space-x-2">
+            <Database className="w-3 h-3" />
+            <span>Excel Data</span>
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu className="space-y-1 px-2">
+              {excelDataItems.map((item) => {
                 const active = isActive(item.url);
                 return (
                   <SidebarMenuItem key={item.title}>

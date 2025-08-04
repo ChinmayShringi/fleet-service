@@ -15,6 +15,10 @@ import { ReportsPage } from "@/pages/ReportsPage";
 import { AnalyticsPage } from "@/pages/AnalyticsPage";
 import { UsersPage } from "@/pages/UsersPage";
 import { SettingsPage } from "@/pages/SettingsPage";
+import { ExcelDataPage } from "@/pages/ExcelDataPage";
+import { VehicleFleetDataPage } from "@/pages/VehicleFleetDataPage";
+import { ElectricVehicleBudgetPage } from "@/pages/ElectricVehicleBudgetPage";
+import { RadioEquipmentCostPage } from "@/pages/RadioEquipmentCostPage";
 import NotFound from "./pages/NotFound";
 import React, { Suspense } from "react";
 
@@ -98,6 +102,42 @@ const App = () => (
                   <Suspense fallback={<LoadingScreen message="Loading Settings..." />}>
                     <DashboardLayout>
                       <SettingsPage />
+                    </DashboardLayout>
+                  </Suspense>
+                </ProtectedRoute>
+              } />
+              <Route path="/excel-data/:fileKey" element={
+                <ProtectedRoute>
+                  <Suspense fallback={<LoadingScreen message="Loading Excel Data..." />}>
+                    <DashboardLayout>
+                      <ExcelDataPage />
+                    </DashboardLayout>
+                  </Suspense>
+                </ProtectedRoute>
+              } />
+              <Route path="/vehicle-fleet-data" element={
+                <ProtectedRoute>
+                  <Suspense fallback={<LoadingScreen message="Loading Vehicle Fleet Data..." />}>
+                    <DashboardLayout>
+                      <VehicleFleetDataPage />
+                    </DashboardLayout>
+                  </Suspense>
+                </ProtectedRoute>
+              } />
+              <Route path="/electric-vehicle-budget" element={
+                <ProtectedRoute>
+                  <Suspense fallback={<LoadingScreen message="Loading EV Budget Data..." />}>
+                    <DashboardLayout>
+                      <ElectricVehicleBudgetPage />
+                    </DashboardLayout>
+                  </Suspense>
+                </ProtectedRoute>
+              } />
+              <Route path="/radio-equipment-cost" element={
+                <ProtectedRoute>
+                  <Suspense fallback={<LoadingScreen message="Loading Radio Equipment Data..." />}>
+                    <DashboardLayout>
+                      <RadioEquipmentCostPage />
                     </DashboardLayout>
                   </Suspense>
                 </ProtectedRoute>
