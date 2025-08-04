@@ -273,9 +273,186 @@ def demo_equipment_update():
     print(f"Example: Moving equipment {equipment_ids} to replacement year {new_replacement_year}")
     update_equipment_replacement_schedule(equipment_ids, new_replacement_year)
 
+def save_pivot_to_excel(pivot_data, lifecycle_stats, not_found_count, total_equipment_count):
+    """
+    Save the LOB pivot table to an Excel file
+    """
+    try:
+        output_filename = 'LOB_Equipment_Lifecycle_Pivot.xlsx'
+        
+        # Create a list to store all data for Excel
+        excel_data = []
+        
+        # Add summary header
+        excel_data.append(['LOB Equipment Lifecycle Pivot Table'])
+        excel_data.append(['Total Equipment:', total_equipment_count])
+        excel_data.append([''])  # Empty row
+        
+        # Add data for each LOB
+        for lob, equipment_list in pivot_data.items():
+            excel_data.append([lob])
+            excel_data.append(['Summary Total:', len(equipment_list), 'equipment items'])
+            
+            # Sort equipment by ID for better readability
+            sorted_equipment = sorted(equipment_list, key=lambda x: x['equipment_id'])
+            
+            for item in sorted_equipment:
+                life_cycle_display = f"{item['life_cycle']} years" if isinstance(item['life_cycle'], int) else item['life_cycle']
+                excel_data.append([
+                    item['equipment_id'], 
+                    item['object_type'], 
+                    life_cycle_display,
+                    item['equipment_desc']
+                ])
+            
+            excel_data.append([''])  # Empty row between LOBs
+        
+        # Add summary statistics
+        excel_data.append(['=== SUMMARY STATISTICS ==='])
+        excel_data.append(['Life Cycle Distribution:'])
+        
+        for cycle, count in sorted(lifecycle_stats.items()):
+            excel_data.append([f"{cycle} years:", count, 'equipment items'])
+        
+        if not_found_count > 0:
+            excel_data.append(['No lifecycle data:', not_found_count, 'equipment items'])
+        
+        # Create DataFrame and save to Excel
+        df_export = pd.DataFrame(excel_data)
+        df_export.to_excel(output_filename, index=False, header=False)
+        
+        print(f"\nSUCCESS: Pivot table saved to {output_filename}")
+        
+    except Exception as e:
+        print(f"WARNING: Could not save pivot table to Excel: {str(e)}")
+
+def create_lob_lifecycle_pivot():
+    """
+    Create a pivot table showing equipment grouped by LOB with lifecycle information
+    """
+    try:
+        print("=== LOB Equipment Lifecycle Pivot Table ===")
+        
+        # Read data.xlsx
+        print("Reading data.xlsx...")
+        df_data = pd.read_excel('data.xlsx')
+        
+        # Read OOL.xlsx with proper structure
+        print("Reading OOL.xlsx...")
+        df_ool = pd.read_excel('OOL.xlsx', skiprows=2, header=None)
+        
+        # Set proper column names for OOL data
+        ool_column_names = [
+            'VL_ObjectType', 'VL_Equipment_Description', 'VL_Life_Cycle',
+            'Empty_1', 'Empty_2', 
+            'VD_ObjectType', 'VD_Equipment_Description', 'VD_Dep_Years',
+            'Empty_3', 'Empty_4',
+            'VWC_LHP', 'VWC_ObjectType', 'VWC_Equipment_Description'
+        ]
+        df_ool.columns = ool_column_names
+        df_ool = df_ool.iloc[1:].copy()  # Remove header row
+        
+        # Check if required columns exist
+        required_columns = ['LOB from Location', 'Equipment', 'ObjectType', 'Equipment descriptn']
+        missing_columns = [col for col in required_columns if col not in df_data.columns]
+        
+        if missing_columns:
+            print(f"ERROR: Missing columns in data.xlsx: {missing_columns}")
+            print("Available columns:", list(df_data.columns))
+            return None
+        
+        # Get unique LOBs
+        unique_lobs = df_data['LOB from Location'].dropna().unique()
+        print(f"Found {len(unique_lobs)} unique LOBs")
+        
+        # Create pivot data structure
+        pivot_data = {}
+        total_equipment_count = 0
+        
+        for lob in sorted(unique_lobs):
+            # Get all equipment for this LOB
+            lob_equipment = df_data[df_data['LOB from Location'] == lob]
+            
+            equipment_details = []
+            
+            for _, row in lob_equipment.iterrows():
+                equipment_id = row['Equipment']
+                object_type = row['ObjectType']
+                equipment_desc = row['Equipment descriptn']
+                
+                # Find lifecycle data in OOL.xlsx (match by Equipment description)
+                ool_match = df_ool[df_ool['VL_Equipment_Description'] == equipment_desc]
+                
+                if not ool_match.empty:
+                    life_cycle = ool_match['VL_Life_Cycle'].iloc[0]
+                    try:
+                        life_cycle = int(float(life_cycle)) if pd.notna(life_cycle) else "N/A"
+                    except:
+                        life_cycle = "N/A"
+                else:
+                    life_cycle = "Not Found"
+                
+                equipment_details.append({
+                    'equipment_id': equipment_id,
+                    'object_type': object_type,
+                    'equipment_desc': equipment_desc,
+                    'life_cycle': life_cycle
+                })
+                
+                total_equipment_count += 1
+            
+            pivot_data[lob] = equipment_details
+        
+        # Display the pivot table
+        print(f"\n=== PIVOT TABLE: Equipment by LOB ===")
+        print(f"Total Equipment: {total_equipment_count}")
+        print("=" * 60)
+        
+        for lob, equipment_list in pivot_data.items():
+            print(f"\n{lob}")
+            print(f" Summary Total: {len(equipment_list)} equipment items")
+            
+            # Sort equipment by ID for better readability
+            sorted_equipment = sorted(equipment_list, key=lambda x: x['equipment_id'])
+            
+            for item in sorted_equipment:
+                life_cycle_display = f"{item['life_cycle']} years" if isinstance(item['life_cycle'], int) else item['life_cycle']
+                print(f" {item['equipment_id']} <{item['object_type']}> <{life_cycle_display}>")
+        
+        # Create summary statistics
+        print(f"\n=== SUMMARY STATISTICS ===")
+        lifecycle_stats = {}
+        not_found_count = 0
+        
+        for equipment_list in pivot_data.values():
+            for item in equipment_list:
+                life_cycle = item['life_cycle']
+                if isinstance(life_cycle, int):
+                    lifecycle_stats[life_cycle] = lifecycle_stats.get(life_cycle, 0) + 1
+                else:
+                    not_found_count += 1
+        
+        print("Life Cycle Distribution:")
+        for cycle, count in sorted(lifecycle_stats.items()):
+            print(f"  {cycle} years: {count} equipment items")
+        
+        if not_found_count > 0:
+            print(f"  No lifecycle data: {not_found_count} equipment items")
+        
+        # Save pivot table to Excel file
+        save_pivot_to_excel(pivot_data, lifecycle_stats, not_found_count, total_equipment_count)
+        
+        return pivot_data
+        
+    except Exception as e:
+        print(f"ERROR: Failed to create LOB lifecycle pivot: {str(e)}")
+        return None
+
 if __name__ == "__main__":
     read_ool_headers()
     print("\n" + "="*50)
     read_ool_data_properly()
     print("\n" + "="*50)
     demo_equipment_update()
+    print("\n" + "="*50)
+    create_lob_lifecycle_pivot()
