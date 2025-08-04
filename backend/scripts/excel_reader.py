@@ -43,6 +43,14 @@ def parse_arguments():
 # Parse command line arguments
 args = parse_arguments()
 
+# Invalidate analytics cache since we're updating the data
+print("Invalidating analytics cache before processing...")
+try:
+    from services.analytics_service import AnalyticsService
+    AnalyticsService.invalidate_cache()
+except Exception as e:
+    print(f"Warning: Could not invalidate analytics cache: {str(e)}")
+
 def calculate_vehicle_data():
     """Calculate vehicle counts and replacement costs for H, L, P categories from data.xlsx for years 2026-2035"""
     # Read the data Excel file

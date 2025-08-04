@@ -19,6 +19,14 @@ class ScriptService:
     def run_excel_reader(cost_parameters=None):
         """Run excel_reader script to generate pivot tables with optional cost parameters"""
         try:
+            # Invalidate analytics cache before running script since data will be updated
+            print("Invalidating analytics cache before running excel_reader...")
+            try:
+                from services.analytics_service import AnalyticsService
+                AnalyticsService.invalidate_cache()
+            except Exception as cache_error:
+                print(f"Warning: Could not invalidate analytics cache: {str(cache_error)}")
+            
             script_path = EXCEL_READER_SCRIPT
             
             # Build command with cost parameters if provided

@@ -9,11 +9,107 @@ from datetime import datetime
 from typing import Dict, List, Any, Optional
 import os
 from .excel_data_service import ExcelDataService
+from constants.file_constants import get_output_file
 
 class AnalyticsService:
     def __init__(self):
         self.excel_service = ExcelDataService()
         self.data_directory = 'database'
+        self.cache_file = get_output_file("ANALYTICS_SUMMARY")
+    
+    def _load_cached_analytics(self) -> Optional[Dict[str, Any]]:
+        """Load analytics from cache file if it exists"""
+        try:
+            if not os.path.exists(self.cache_file):
+                print(f"Analytics cache file not found: {self.cache_file}")
+                return None
+                
+            print(f"Loading analytics from cache: {self.cache_file}")
+            
+            # Read the cached data from Excel
+            with pd.ExcelFile(self.cache_file) as excel_file:
+                sheet_names = excel_file.sheet_names
+                
+                cached_data = {}
+                
+                # Load file summaries if available
+                if 'file_summaries' in sheet_names:
+                    summaries_df = pd.read_excel(excel_file, sheet_name='file_summaries')
+                    cached_data['file_summaries'] = summaries_df.to_dict('records')
+                
+                # Load quick stats if available
+                if 'quick_stats' in sheet_names:
+                    quick_stats_df = pd.read_excel(excel_file, sheet_name='quick_stats')
+                    if not quick_stats_df.empty:
+                        cached_data['quick_stats'] = quick_stats_df.iloc[0].to_dict()
+                
+                # Load global summary if available
+                if 'global_summary' in sheet_names:
+                    global_summary_df = pd.read_excel(excel_file, sheet_name='global_summary')
+                    if not global_summary_df.empty:
+                        cached_data['global_summary'] = global_summary_df.iloc[0].to_dict()
+                
+                return cached_data
+                
+        except Exception as e:
+            print(f"Error loading cached analytics: {str(e)}")
+            return None
+    
+    def _save_analytics_to_cache(self, file_summaries: Dict, quick_stats: Dict, global_summary: Dict):
+        """Save analytics data to cache file"""
+        try:
+            print(f"Saving analytics to cache: {self.cache_file}")
+            
+            with pd.ExcelWriter(self.cache_file, engine='openpyxl') as writer:
+                # Save file summaries
+                if file_summaries and 'summaries' in file_summaries:
+                    summaries_data = []
+                    for file_key, data in file_summaries['summaries'].items():
+                        summary_row = {
+                            'file_key': file_key,
+                            'filename': data.get('filename', ''),
+                            'summary_json': str(data.get('summary', {}))
+                        }
+                        summaries_data.append(summary_row)
+                    
+                    summaries_df = pd.DataFrame(summaries_data)
+                    summaries_df.to_excel(writer, sheet_name='file_summaries', index=False)
+                
+                # Save quick stats
+                if quick_stats:
+                    quick_stats_df = pd.DataFrame([quick_stats])
+                    quick_stats_df.to_excel(writer, sheet_name='quick_stats', index=False)
+                
+                # Save global summary
+                if global_summary:
+                    global_summary_df = pd.DataFrame([global_summary])
+                    global_summary_df.to_excel(writer, sheet_name='global_summary', index=False)
+                
+                # Add metadata
+                metadata = {
+                    'generated_at': datetime.now().isoformat(),
+                    'cache_version': '1.0'
+                }
+                metadata_df = pd.DataFrame([metadata])
+                metadata_df.to_excel(writer, sheet_name='metadata', index=False)
+            
+            print(f"Analytics cache saved successfully to {self.cache_file}")
+            
+        except Exception as e:
+            print(f"Error saving analytics to cache: {str(e)}")
+    
+    @staticmethod
+    def invalidate_cache():
+        """Delete the analytics cache file to force regeneration"""
+        cache_file = get_output_file("ANALYTICS_SUMMARY")
+        try:
+            if os.path.exists(cache_file):
+                os.remove(cache_file)
+                print(f"Analytics cache invalidated: {cache_file}")
+            else:
+                print(f"Analytics cache file not found, nothing to invalidate: {cache_file}")
+        except Exception as e:
+            print(f"Error invalidating analytics cache: {str(e)}")
         
     def get_all_file_summaries(self) -> Dict[str, Any]:
         """Get comprehensive summaries for all Excel files"""
@@ -313,8 +409,20 @@ class AnalyticsService:
         return 0
     
     def get_dashboard_summary(self) -> Dict[str, Any]:
-        """Get high-level summary suitable for dashboard widgets"""
+        """Get high-level summary suitable for dashboard widgets - uses caching for performance"""
         try:
+            # Try to load from cache first
+            cached_data = self._load_cached_analytics()
+            if cached_data and 'quick_stats' in cached_data:
+                print("Returning dashboard summary from cache")
+                return {
+                    'success': True,
+                    'dashboard': cached_data['quick_stats']
+                }
+            
+            print("Cache miss - generating fresh dashboard summary")
+            
+            # Generate fresh data if no cache
             all_summaries = self.get_all_file_summaries()
             
             if not all_summaries['success']:
@@ -359,6 +467,16 @@ class AnalyticsService:
                         'filename': file_data['filename'],
                         'records': summary.get('basic_stats', {}).get('total_rows', 0)
                     }
+            
+            # Save the fresh data to cache for next time
+            try:
+                self._save_analytics_to_cache(
+                    file_summaries=all_summaries,
+                    quick_stats=dashboard_data,
+                    global_summary=dashboard_data
+                )
+            except Exception as cache_error:
+                print(f"Failed to save to cache: {str(cache_error)}")
             
             return {
                 'success': True,

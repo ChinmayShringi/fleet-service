@@ -145,13 +145,21 @@ def update_equipment_replacement_schedule(equipment_ids, new_replacement_year):
         new_replacement_year (int): New replacement year (e.g., 2027)
     """
     try:
-        # Read data.xlsx
-        print("Reading data.xlsx...")
-        df_data = pd.read_excel('data.xlsx')
+        # Read vehicle fleet master data
+        print("Reading vehicle fleet master data...")
+        data_file = get_input_file_safe("VEHICLE_FLEET_MASTER_DATA")
+        if data_file is None:
+            print("ERROR: Vehicle fleet master data file not found")
+            return None
+        df_data = pd.read_excel(data_file)
         
         # Read OOL.xlsx with proper structure
-        print("Reading OOL.xlsx...")
-        df_ool = pd.read_excel('OOL.xlsx', skiprows=2, header=None)
+        print("Reading equipment lifecycle reference...")
+        ool_file = get_input_file_safe("EQUIPMENT_LIFECYCLE_REFERENCE")
+        if ool_file is None:
+            print("ERROR: Equipment lifecycle reference file not found")
+            return None
+        df_ool = pd.read_excel(ool_file, skiprows=2, header=None)
         
         # Set proper column names for OOL data
         ool_column_names = [
@@ -232,9 +240,9 @@ def update_equipment_replacement_schedule(equipment_ids, new_replacement_year):
                     print(f"    WARNING: Column {forecast_col} not found")
         
         # Save updated data back to Excel
-        output_filename = get_output_file("VEHICLE_FLEET_UPDATED_DATA")
-        df_data.to_excel(output_filename, index=False)
-        print(f"\nSUCCESS: Updated data saved to {output_filename}")
+        output_file = get_input_file("VEHICLE_FLEET_MASTER_DATA")
+        df_data.to_excel(output_file, index=False)
+        print(f"\nSUCCESS: Updated data saved to {output_file}")
         
         return df_data
         

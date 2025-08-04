@@ -46,7 +46,8 @@ OUTPUT_FILES = {
     "VEHICLE_REPLACEMENT_DETAILED_FORECAST": os.path.join(DATABASE_DIR, "vehicle_replacement_detailed_forecast.xlsx"),
     "VEHICLE_REPLACEMENT_BY_CATEGORY": os.path.join(DATABASE_DIR, "vehicle_replacement_by_category.xlsx"),
     "HEAVY_VEHICLE_EV_TRANSITION_ANALYSIS": os.path.join(DATABASE_DIR, "heavy_vehicle_ev_transition_analysis.xlsx"),
-    "LIGHT_VAN_EV_TRANSITION_ANALYSIS": os.path.join(DATABASE_DIR, "light_van_ev_transition_analysis.xlsx")
+    "LIGHT_VAN_EV_TRANSITION_ANALYSIS": os.path.join(DATABASE_DIR, "light_van_ev_transition_analysis.xlsx"),
+    "ANALYTICS_SUMMARY": os.path.join(DATABASE_DIR, "analytics_summary.xlsx")
 }
 
 # Sheet Names

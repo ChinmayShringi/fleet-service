@@ -3,6 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { CostParametersDialog } from '@/components/fleet/CostParametersDialog';
+import { EquipmentReallocationDialog } from '@/components/equipment/EquipmentReallocationDialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,8 +26,9 @@ export const DashboardHeader: React.FC = () => {
       </div>
 
       <div className="flex items-center space-x-4">
-        {/* Cost Parameters */}
+        {/* Fleet Management Tools */}
         <CostParametersDialog />
+        <EquipmentReallocationDialog />
         
         {/* Notifications */}
         <Button variant="ghost" size="sm" className="relative">

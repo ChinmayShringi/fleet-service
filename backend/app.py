@@ -19,6 +19,7 @@ from routes.script_routes import script_bp
 from routes.auth_routes import auth_bp
 from routes.excel_data_routes import excel_data_bp
 from routes.analytics_routes import analytics_bp
+from routes.equipment_routes import equipment_bp
 
 # Import services
 from services.user_service import UserService
@@ -40,6 +41,7 @@ def create_app():
     app.register_blueprint(auth_bp)
     app.register_blueprint(excel_data_bp)
     app.register_blueprint(analytics_bp)
+    app.register_blueprint(equipment_bp)
     
     return app
 
@@ -88,6 +90,11 @@ if __name__ == '__main__':
     print("  GET  /api/analytics/vehicles")
     print("  GET  /api/analytics/equipment")
     print("  GET  /api/analytics/charts?type={chart_type}")
+    print("")
+    print("Equipment Management Endpoints:")
+    print("  POST /api/equipment/reallocate")
+    print("  GET  /api/equipment/info?ids={equipment_ids}")
+    print("  POST /api/equipment/info")
     print("=" * 50)
     print("DEFAULT ADMIN CREDENTIALS:")
     print("  Email: admin@gmail.com")
