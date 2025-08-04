@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -49,6 +49,19 @@ export const CostParametersDialog = () => {
     iceChassisPickup: 44000,
     evChassisPickup: 54000,
   });
+
+  // Load saved parameters from localStorage on component mount
+  useEffect(() => {
+    const savedParameters = localStorage.getItem('pseg_cost_parameters');
+    if (savedParameters) {
+      try {
+        const parsed = JSON.parse(savedParameters);
+        setParameters(parsed);
+      } catch (error) {
+        console.error('Error parsing saved cost parameters:', error);
+      }
+    }
+  }, []);
 
   const handleSave = () => {
     // Save parameters to local storage or API

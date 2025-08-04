@@ -14,8 +14,12 @@ class ScriptController:
         try:
             # Get cost parameters from request body (if any)
             cost_parameters = {}
-            if request.is_json and request.json:
-                cost_parameters = request.json.get('costParameters', {})
+            try:
+                if request.is_json and request.json:
+                    cost_parameters = request.json.get('costParameters', {})
+            except Exception:
+                # Handle empty JSON body or invalid JSON gracefully
+                cost_parameters = {}
             
             result = ScriptService.run_excel_reader(cost_parameters)
             
