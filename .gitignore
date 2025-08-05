@@ -143,3 +143,18 @@ cython_debug/
 .idea/
 
 database/
+
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+package-lock.json
+yarn.lock
+.pnpm-debug.log
+.npm/
+dist/
+build/
+# End of Node.js ignores

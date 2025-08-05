@@ -1,0 +1,33 @@
+{
+  "name": "vehicle-fleet-management",
+  "version": "1.0.0",
+  "description": "A comprehensive full-stack application for managing vehicle fleet data, equipment lifecycle tracking, and generating detailed analytics reports.",
+  "scripts": {
+    "dev": "concurrently --names \"BACKEND,FRONTEND\" --prefix-colors \"red,blue\" \"npm run backend\" \"npm run frontend\"",
+    "start": "npm run dev",
+    "backend": "cd backend && echo 'Starting Flask backend...' && python app.py",
+    "frontend": "cd frontend && echo 'Starting React frontend...' && npm run dev",
+    "install-all": "npm install && cd frontend && npm install && cd ../backend && pip install -r requirements.txt",
+    "build": "cd frontend && npm run build",
+    "setup": "npm run install-all",
+    "test-backend": "cd backend && python -c 'import sys; print(f\"Python: {sys.version}\"); import flask; print(f\"Flask: {flask.__version__}\"); print(\"Backend dependencies OK!\")'",
+    "check-health": "curl -s http://localhost:3300/api/health || echo 'Backend not running'"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "keywords": [
+    "fleet-management",
+    "vehicle-tracking",
+    "analytics",
+    "full-stack",
+    "react",
+    "flask"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": ""
+  }
+}

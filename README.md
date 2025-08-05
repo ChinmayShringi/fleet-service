@@ -35,7 +35,46 @@ vehicle-fleet-management/
 - **Node.js 16+** (for frontend)
 - **npm or yarn** (package manager)
 
-### Backend Setup
+### 🎯 One-Command Setup & Run
+
+**Install all dependencies and start both frontend & backend:**
+
+```bash
+# Install all dependencies (frontend, backend, and concurrently)
+npm run setup
+
+# Start both frontend and backend with one command
+npm start
+```
+
+That's it! 🎉 
+
+- **Frontend** will be available at: http://localhost:8080
+- **Backend API** will be available at: http://localhost:3300
+
+### 🔧 Individual Commands
+
+If you need to run components separately:
+
+```bash
+# Run both (same as npm start)
+npm run dev
+
+# Run only backend
+npm run backend
+
+# Run only frontend  
+npm run frontend
+
+# Build frontend for production
+npm run build
+```
+
+### 📝 Manual Setup (Alternative)
+
+If you prefer to set up each component manually:
+
+#### Backend Setup
 
 1. **Navigate to backend directory:**
    ```bash
@@ -54,7 +93,7 @@ vehicle-fleet-management/
    
    Server will run on `http://localhost:3300`
 
-### Frontend Setup
+#### Frontend Setup
 
 1. **Navigate to frontend directory:**
    ```bash
@@ -71,7 +110,7 @@ vehicle-fleet-management/
    npm run dev
    ```
    
-   Frontend will run on `http://localhost:5173`
+   Frontend will run on `http://localhost:8080`
 
 ## 🔧 Features
 
