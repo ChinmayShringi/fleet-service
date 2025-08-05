@@ -22,7 +22,9 @@ import {
   ExcelDataRequest, 
   ExcelColumnStats
 } from '@/services/excelDataService';
-import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar } from 'recharts';
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar, PieChart, Pie, Cell } from 'recharts';
+
+const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#f97316', '#84cc16'];
 
 export const ElectricVehicleBudgetPage = () => {
   const [data, setData] = useState<ExcelDataResponse | null>(null);
@@ -32,17 +34,17 @@ export const ElectricVehicleBudgetPage = () => {
   const [columnStats, setColumnStats] = useState<ExcelColumnStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(false);
   const [statsError, setStatsError] = useState<string | null>(null);
-  const [chartData, setChartData] = useState<any>({});
+  const [analysisData, setAnalysisData] = useState<any>(null); // Store analysis data for visualizations
+
+  // Handler to receive analysis data from QuickStatsCards
+  const handleAnalysisDataLoaded = (data: any) => {
+    setAnalysisData(data);
+    console.log('Received equipment lifecycle analysis data for visualizations:', data);
+  };
 
   useEffect(() => {
     handleDataRequest({ page: 1, page_size: 100 });
   }, []);
-
-  useEffect(() => {
-    if (data?.data) {
-      generateChartData(data.data);
-    }
-  }, [data]);
 
   const handleDataRequest = async (params: ExcelDataRequest) => {
     setLoading(true);
@@ -99,61 +101,7 @@ export const ElectricVehicleBudgetPage = () => {
     }
   };
 
-  const generateChartData = (records: any[]) => {
-    // Budget trend by year
-    const yearlyBudget = records.reduce((acc, record) => {
-      const year = record.Year || record.year || 'Unknown';
-      const budget = parseFloat(record.Budget || record.budget || record.Cost || record.cost || 0);
-      
-      if (acc[year]) {
-        acc[year] += budget;
-      } else {
-        acc[year] = budget;
-      }
-      return acc;
-    }, {} as Record<string, number>);
 
-    // EV adoption rate
-    const adoptionData = records.reduce((acc, record) => {
-      const year = record.Year || record.year || 'Unknown';
-      const evCount = record.EV_Count || record.ev_count || record.Electric_Count || 0;
-      const totalCount = record.Total_Count || record.total_count || record.Fleet_Size || 1;
-      
-      acc[year] = {
-        year,
-        ev_count: evCount,
-        total_count: totalCount,
-        adoption_rate: (evCount / totalCount) * 100
-      };
-      return acc;
-    }, {} as Record<string, any>);
-
-    // Category breakdown
-    const categoryData = records.reduce((acc, record) => {
-      const category = record.Category || record.Vehicle_Type || record.Type || 'Unknown';
-      const budget = parseFloat(record.Budget || record.Cost || 0);
-      
-      if (acc[category]) {
-        acc[category] += budget;
-      } else {
-        acc[category] = budget;
-      }
-      return acc;
-    }, {} as Record<string, number>);
-
-    setChartData({
-      yearlyTrend: Object.entries(yearlyBudget)
-        .map(([year, budget]) => ({ year: parseInt(year) || 0, budget }))
-        .sort((a, b) => a.year - b.year)
-        .slice(0, 15),
-      adoptionTrend: Object.values(adoptionData)
-        .sort((a: any, b: any) => a.year - b.year)
-        .slice(0, 15),
-      categoryBreakdown: Object.entries(categoryData)
-        .map(([category, budget]) => ({ category, budget }))
-        .slice(0, 10)
-    });
-  };
 
   const calculateSummaryStats = () => {
     if (!data?.data) return null;
@@ -199,7 +147,10 @@ export const ElectricVehicleBudgetPage = () => {
       </div>
 
       {/* Analytics Overview */}
-      <QuickStatsCards />
+      <QuickStatsCards 
+        pageType="electric-vehicle-budget" 
+        onAnalysisDataLoaded={handleAnalysisDataLoaded}
+      />
 
       <Tabs defaultValue="data" className="w-full">
         <TabsList>
@@ -225,76 +176,152 @@ export const ElectricVehicleBudgetPage = () => {
             fileKey="electric_vehicle_budget_analysis"
             filename="electric_vehicle_budget_analysis.xlsx"
           />
-          <div className="grid gap-6 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Budget Trend by Year</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={chartData.yearlyTrend || []}>
-                      <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                      <XAxis dataKey="year" className="text-xs" />
-                      <YAxis className="text-xs" tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`} />
-                      <Tooltip formatter={(value) => [`$${Number(value).toLocaleString()}`, 'Budget']} />
-                      <Line 
-                        type="monotone" 
-                        dataKey="budget" 
-                        stroke="hsl(var(--primary))" 
-                        strokeWidth={2}
-                        dot={{ fill: 'hsl(var(--primary))', strokeWidth: 2, r: 4 }}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">EV Adoption Rate</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={chartData.adoptionTrend || []}>
-                      <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                      <XAxis dataKey="year" className="text-xs" />
-                      <YAxis className="text-xs" tickFormatter={(value) => `${value}%`} />
-                      <Tooltip formatter={(value) => [`${Number(value).toFixed(1)}%`, 'Adoption Rate']} />
-                      <Line 
-                        type="monotone" 
-                        dataKey="adoption_rate" 
-                        stroke="#10b981" 
-                        strokeWidth={2}
-                        dot={{ fill: '#10b981', strokeWidth: 2, r: 4 }}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
 
-            <Card className="md:col-span-2">
-              <CardHeader>
-                <CardTitle className="text-base">Budget by Category</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartData.categoryBreakdown || []}>
-                      <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                      <XAxis dataKey="category" className="text-xs" angle={-45} textAnchor="end" height={100} />
-                      <YAxis className="text-xs" tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`} />
-                      <Tooltip formatter={(value) => [`$${Number(value).toLocaleString()}`, 'Budget']} />
-                      <Bar dataKey="budget" fill="hsl(var(--primary))" radius={[2, 2, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          {/* Equipment Lifecycle Analysis Visualizations */}
+          {analysisData && (
+            <div className="space-y-6">
+              <h3 className="text-lg font-semibold">Equipment Lifecycle Analysis</h3>
+              
+              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                {/* Equipment Lifecycle Distribution */}
+                <Card className="lg:col-span-2">
+                  <CardHeader>
+                    <CardTitle>Equipment Lifecycle Distribution</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {analysisData?.lifecycle_distribution ? (
+                      <ResponsiveContainer width="100%" height={350}>
+                        <BarChart data={analysisData.lifecycle_distribution.map((item: any) => ({
+                          lifecycle: item.lifecycle,
+                          count: item.count,
+                          percentage: ((item.count / analysisData.total_equipment) * 100).toFixed(1)
+                        }))}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="lifecycle" angle={-45} textAnchor="end" height={100} fontSize={11} />
+                          <YAxis />
+                          <Tooltip formatter={(value: number, name: string) => [
+                            name === 'count' ? `${value} equipment` : value,
+                            name === 'count' ? 'Equipment Count' : name
+                          ]} />
+                          <Bar dataKey="count" fill="#22c55e" radius={[2, 2, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="flex items-center justify-center h-48 text-muted-foreground">
+                        No lifecycle data available
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Equipment Count Summary */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Equipment Summary</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      <div className="text-center">
+                        <div className="text-3xl font-bold text-primary">
+                          {analysisData?.total_equipment?.toLocaleString() || 0}
+                        </div>
+                        <div className="text-sm text-muted-foreground">Total Equipment Items</div>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <div className="text-sm font-medium">Lifecycle Categories:</div>
+                        <div className="text-2xl font-bold text-secondary-foreground">
+                          {analysisData?.lifecycle_distribution?.length || 0}
+                        </div>
+                      </div>
+
+                      {analysisData?.lifecycle_distribution && (
+                        <div className="space-y-1">
+                          <div className="text-xs text-muted-foreground">Distribution Range:</div>
+                          <div className="text-sm">
+                            {Math.min(...analysisData.lifecycle_distribution.map((item: any) => item.count))} - {Math.max(...analysisData.lifecycle_distribution.map((item: any) => item.count))} items
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Lifecycle Pie Chart */}
+                <Card className="lg:col-span-3">
+                  <CardHeader>
+                    <CardTitle>Equipment Distribution by Lifecycle Category</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {analysisData?.lifecycle_distribution ? (
+                      <ResponsiveContainer width="100%" height={400}>
+                        <PieChart>
+                          <Pie
+                            data={analysisData.lifecycle_distribution.map((item: any) => ({
+                              name: item.lifecycle,
+                              value: item.count,
+                              percentage: ((item.count / analysisData.total_equipment) * 100).toFixed(1)
+                            }))}
+                            cx="50%"
+                            cy="50%"
+                            labelLine={false}
+                            label={({ name, percentage }) => `${name}: ${percentage}%`}
+                            outerRadius={120}
+                            fill="#8884d8"
+                            dataKey="value"
+                          >
+                            {analysisData.lifecycle_distribution.map((_: any, index: number) => (
+                              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip formatter={(value: number) => [`${value} equipment`, 'Count']} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="flex items-center justify-center h-48 text-muted-foreground">
+                        No distribution data available
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Equipment Replacement Priority */}
+                <Card className="lg:col-span-3">
+                  <CardHeader>
+                    <CardTitle>Equipment Replacement Priority Analysis</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {analysisData?.lifecycle_distribution ? (
+                      <ResponsiveContainer width="100%" height={300}>
+                        <BarChart data={analysisData.lifecycle_distribution
+                          .map((item: any) => ({
+                            lifecycle: item.lifecycle,
+                            count: item.count,
+                            priority: item.lifecycle.includes('20+ years') || item.lifecycle.includes('15-20') ? 'High' :
+                                     item.lifecycle.includes('10-15') || item.lifecycle.includes('5-10') ? 'Medium' : 'Low',
+                            priorityScore: item.lifecycle.includes('20+ years') ? 4 :
+                                          item.lifecycle.includes('15-20') ? 3 :
+                                          item.lifecycle.includes('10-15') ? 2 : 1
+                          }))
+                          .sort((a, b) => b.priorityScore - a.priorityScore)}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="lifecycle" angle={-45} textAnchor="end" height={100} />
+                          <YAxis />
+                          <Tooltip formatter={(value: number) => [`${value} equipment`, 'Count']} />
+                          <Bar dataKey="count" fill="#f59e0b" radius={[2, 2, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="flex items-center justify-center h-48 text-muted-foreground">
+                        No priority data available
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          )}
         </TabsContent>
       </Tabs>
 

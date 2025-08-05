@@ -14,15 +14,18 @@ import {
   Package,
   FileText
 } from 'lucide-react';
-import { analyticsService, QuickStats } from '@/services/analyticsService';
+import { analyticsService, QuickStats, QuickStatsResponse } from '@/services/analyticsService';
 import { useToast } from '@/hooks/use-toast';
 
 interface QuickStatsCardsProps {
   className?: string;
+  pageType?: string; // e.g., 'vehicle-fleet', 'radio-equipment', 'equipment-lifecycle'
+  onAnalysisDataLoaded?: (analysisData: any) => void; // Callback to pass analysis data to parent for visualizations
 }
 
-export const QuickStatsCards = ({ className = '' }: QuickStatsCardsProps) => {
+export const QuickStatsCards = ({ className = '', pageType, onAnalysisDataLoaded }: QuickStatsCardsProps) => {
   const [stats, setStats] = useState<QuickStats | null>(null);
+  const [analysisData, setAnalysisData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
@@ -32,11 +35,18 @@ export const QuickStatsCards = ({ className = '' }: QuickStatsCardsProps) => {
       setLoading(true);
       setError(null);
       
-      const response = await analyticsService.getQuickStats();
+      const response = await analyticsService.getQuickStats(pageType);
       
       if (response.success && response.data) {
-        setStats(response.data);
-        console.log('Quick stats loaded:', response.data);
+        setStats(response.data.quick_stats);
+        setAnalysisData(response.data.analysis_data);
+        
+        // Pass analysis data to parent component for visualizations
+        if (onAnalysisDataLoaded && response.data.analysis_data) {
+          onAnalysisDataLoaded(response.data.analysis_data);
+        }
+        
+        console.log('Analysis data loaded for', pageType, ':', !!response.data.analysis_data);
       } else {
         setError(response.error || 'Failed to load statistics');
         toast({

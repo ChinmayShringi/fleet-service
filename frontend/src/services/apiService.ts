@@ -111,7 +111,15 @@ class ApiService {
   }
 
   async getUserStats() {
-    return this.request<UserStats>('/api/auth/stats');
+    const response = await this.request<{ stats: UserStats }>('/api/auth/stats');
+    // Map the response to match expected structure
+    if (response.success && response.data?.stats) {
+      return {
+        success: true,
+        data: response.data.stats
+      };
+    }
+    return response;
   }
 
   // File Management

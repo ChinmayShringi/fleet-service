@@ -4,6 +4,32 @@ Analytics Controller for handling analytics and summary API requests.
 
 from flask import jsonify, request
 from services.analytics_service import AnalyticsService
+import sys
+import os
+
+# Add scripts directory to path so we can import get_analysis
+sys.path.append(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'scripts'))
+try:
+    from get_analysis import (
+        get_equipment_lifecycle_analysis,
+        get_equipment_lifecycle_reference,
+        get_radio_equipment_cost_analysis,
+        get_vehicle_replacement_by_category_analysis,
+        get_vehicle_replacement_detailed_forecast_analysis
+    )
+except ImportError as e:
+    print(f"Warning: Could not import analysis functions: {e}")
+    # Define fallback functions
+    def get_equipment_lifecycle_analysis():
+        return {'success': False, 'error': 'Analysis script not available'}
+    def get_equipment_lifecycle_reference():
+        return {'success': False, 'error': 'Analysis script not available'}
+    def get_radio_equipment_cost_analysis():
+        return {'success': False, 'error': 'Analysis script not available'}
+    def get_vehicle_replacement_by_category_analysis():
+        return {'success': False, 'error': 'Analysis script not available'}
+    def get_vehicle_replacement_detailed_forecast_analysis():
+        return {'success': False, 'error': 'Analysis script not available'}
 
 # Initialize the analytics service
 analytics_service = AnalyticsService()
@@ -231,25 +257,21 @@ def get_equipment_analytics():
         }), 500
 
 def get_quick_stats():
-    """Get quick stats for dashboard widgets"""
+    """Get quick stats for dashboard widgets using Excel analysis scripts for specific page"""
     try:
-        dashboard_summary = analytics_service.get_dashboard_summary()
+        # Get page parameter from request
+        page_type = request.args.get('page', 'default')
+        print(f"Fetching quick stats for page type: {page_type}")
         
-        if not dashboard_summary['success']:
-            return jsonify(dashboard_summary), 500
-        
-        dashboard = dashboard_summary['dashboard']
-        
-        # Use only cached dashboard data for performance - no expensive analytics calls
+        # Initialize stats with default values
         quick_stats = {
-            'total_files': dashboard.get('total_files', 0),
-            'total_records': dashboard.get('total_records', 0),
-            'total_vehicles': dashboard.get('total_vehicles', 0),
-            'total_equipment': dashboard.get('total_equipment', 0),
-            'total_value': dashboard.get('total_value', 0),
-            'total_value_formatted': f"${dashboard.get('total_value', 0):,.0f}",
-            'total_value_millions': f"${dashboard.get('total_value', 0) / 1_000_000:.1f}M" if dashboard.get('total_value', 0) > 0 else "$0.0M",
-            # Default values for additional stats - can be improved later by including in cache
+            'total_files': 1,
+            'total_records': 0,
+            'total_vehicles': 0,
+            'total_equipment': 0,
+            'total_value': 0,
+            'total_value_formatted': '$0',
+            'total_value_millions': '$0.0M',
             'avg_cost': 0,
             'avg_cost_formatted': '$0',
             'avg_year': 0,
@@ -257,13 +279,177 @@ def get_quick_stats():
             'unique_locations': 0
         }
         
+        analysis_result = None
+        analysis_type = None
+        
+        # Call the appropriate analysis function based on page type
+        if page_type == 'vehicle-fleet':
+            print("Getting vehicle replacement by category analysis for vehicle fleet page...")
+            analysis_result = get_vehicle_replacement_by_category_analysis()
+            analysis_type = 'vehicle_categories'
+            
+            if analysis_result['success']:
+                categories = analysis_result.get('Categories', [])
+                grand_total = analysis_result.get('grand_total', {})
+                
+                # Extract vehicle counts and costs from grand total
+                total_vehicles = 0
+                total_value = 0
+                for header, value in grand_total.items():
+                    if isinstance(value, (int, float)) and value > 0:
+                        if 'count' in header.lower() or 'vehicle' in header.lower():
+                            total_vehicles += int(value)
+                        elif 'cost' in header.lower():
+                            total_value += value
+                
+                avg_cost = total_value / total_vehicles if total_vehicles > 0 else 0
+                
+                quick_stats.update({
+                    'total_records': len(categories),
+                    'total_vehicles': total_vehicles,
+                    'total_value': total_value,
+                    'total_value_formatted': f"${total_value:,.0f}",
+                    'total_value_millions': f"${total_value / 1_000_000:.1f}M" if total_value > 0 else "$0.0M",
+                    'avg_cost': avg_cost,
+                    'avg_cost_formatted': f"${avg_cost:,.0f}",
+                    'unique_locations': len(categories)
+                })
+                
+        elif page_type == 'radio-equipment':
+            print("Getting radio equipment cost analysis for radio equipment page...")
+            analysis_result = get_radio_equipment_cost_analysis()
+            analysis_type = 'radio_equipment'
+            
+            if analysis_result['success']:
+                lobs = analysis_result.get('LOB', [])
+                grand_total = analysis_result.get('grand_total', {})
+                
+                # Extract financial data from grand total
+                total_value = 0
+                radio_count = 0
+                for header, value in grand_total.items():
+                    if isinstance(value, (int, float)) and value > 0:
+                        if 'count' in header.lower():
+                            radio_count += int(value)
+                        elif 'spend' in header.lower() or 'cost' in header.lower():
+                            total_value += value
+                
+                avg_cost = total_value / radio_count if radio_count > 0 else 0
+                
+                quick_stats.update({
+                    'total_records': len(lobs),
+                    'total_equipment': radio_count,
+                    'total_value': total_value,
+                    'total_value_formatted': f"${total_value:,.0f}",
+                    'total_value_millions': f"${total_value / 1_000_000:.1f}M" if total_value > 0 else "$0.0M",
+                    'avg_cost': avg_cost,
+                    'avg_cost_formatted': f"${avg_cost:,.0f}",
+                    'unique_makes': len(lobs)
+                })
+                
+        elif page_type == 'equipment-lifecycle' or page_type == 'electric-vehicle-budget':
+            print("Getting equipment lifecycle analysis for equipment page...")
+            analysis_result = get_equipment_lifecycle_analysis()
+            analysis_type = 'equipment_lifecycle'
+            
+            if analysis_result['success']:
+                total_equipment = analysis_result.get('total_equipment', 0)
+                lifecycle_distribution = analysis_result.get('lifecycle_distribution', [])
+                
+                quick_stats.update({
+                    'total_records': len(lifecycle_distribution),
+                    'total_equipment': total_equipment,
+                    'unique_locations': len(lifecycle_distribution)
+                })
+                
+        elif page_type == 'vehicle-forecast' or page_type == 'vehicle-replacement-forecast':
+            print("Getting vehicle replacement detailed forecast analysis for forecast page...")
+            analysis_result = get_vehicle_replacement_detailed_forecast_analysis()
+            analysis_type = 'vehicle_forecast'
+            
+            if analysis_result['success']:
+                lobs = analysis_result.get('LOB', [])
+                data = analysis_result.get('data', {})
+                
+                # Extract data from LOB totals
+                total_vehicles = 0
+                total_value = 0
+                total_records = 0
+                
+                for lob, lob_data in data.items():
+                    if lob == "Grand Total":
+                        continue
+                    total_records += len(lob_data)
+                    
+                    # Extract values from totals
+                    for total_type, values in lob_data.items():
+                        if isinstance(values, dict):
+                            for header, value in values.items():
+                                if isinstance(value, (int, float)) and value > 0:
+                                    if 'count' in header.lower() or 'vehicle' in header.lower():
+                                        total_vehicles += int(value)
+                                    elif 'cost' in header.lower():
+                                        total_value += value
+                
+                avg_cost = total_value / total_vehicles if total_vehicles > 0 else 0
+                
+                quick_stats.update({
+                    'total_records': total_records,
+                    'total_vehicles': total_vehicles,
+                    'total_value': total_value,
+                    'total_value_formatted': f"${total_value:,.0f}",
+                    'total_value_millions': f"${total_value / 1_000_000:.1f}M" if total_value > 0 else "$0.0M",
+                    'avg_cost': avg_cost,
+                    'avg_cost_formatted': f"${avg_cost:,.0f}",
+                    'unique_makes': len(lobs)
+                })
+                
+        elif page_type == 'equipment-lifecycle-reference':
+            print("Getting equipment lifecycle reference analysis for equipment reference page...")
+            analysis_result = get_equipment_lifecycle_reference()
+            analysis_type = 'equipment_reference'
+            
+            if analysis_result['success']:
+                equipment_data = analysis_result.get('equipment_lifecycle_data', [])
+                total_entries = analysis_result.get('total_entries', 0)
+                
+                # Count unique lifecycle categories
+                unique_lifecycles = set()
+                for item in equipment_data:
+                    if item.get('life_cycle'):
+                        unique_lifecycles.add(item['life_cycle'])
+                
+                quick_stats.update({
+                    'total_records': total_entries,
+                    'total_equipment': total_entries,
+                    'unique_locations': len(unique_lifecycles),
+                    'unique_makes': len(unique_lifecycles)
+                })
+                
+        else:
+            # Default case - return basic stats
+            print(f"No specific analysis for page type '{page_type}', returning default stats")
+            analysis_result = {'success': True, 'message': 'Default stats returned'}
+            analysis_type = 'default'
+        
+        print(f"Quick stats calculated for {page_type}:")
+        print(f"  Records: {quick_stats['total_records']}")
+        print(f"  Vehicles: {quick_stats['total_vehicles']}")
+        print(f"  Equipment: {quick_stats['total_equipment']}")
+        print(f"  Total Value: {quick_stats['total_value_formatted']}")
+        print(f"  Average Cost: {quick_stats['avg_cost_formatted']}")
+        
         return jsonify({
             'success': True,
             'quick_stats': quick_stats,
-            'dashboard_summary': dashboard
+            'page_type': page_type,
+            'analysis_type': analysis_type,
+            'analysis_success': analysis_result['success'] if analysis_result else False,
+            'analysis_data': analysis_result  # Include full analysis data for frontend visualizations
         })
         
     except Exception as e:
+        print(f"Error in get_quick_stats: {str(e)}")
         return jsonify({
             'success': False,
             'error': f'Failed to get quick stats: {str(e)}'

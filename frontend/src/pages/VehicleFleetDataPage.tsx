@@ -35,19 +35,22 @@ export const VehicleFleetDataPage = () => {
   const [columnStats, setColumnStats] = useState<ExcelColumnStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(false);
   const [statsError, setStatsError] = useState<string | null>(null);
-  const [chartData, setChartData] = useState<any>({});
+  const [analysisData, setAnalysisData] = useState<any>(null); // Store analysis data for visualizations
+
+  // Handler to receive analysis data from QuickStatsCards
+  const handleAnalysisDataLoaded = (data: any) => {
+    setAnalysisData(data);
+    console.log('Received vehicle fleet analysis data for visualizations:', data);
+  };
 
   // Load initial data
   useEffect(() => {
     handleDataRequest({ page: 1, page_size: 50 });
   }, []);
 
-  // Generate chart data when main data changes
-  useEffect(() => {
-    if (data?.data) {
-      generateChartData(data.data);
-    }
-  }, [data]);
+
+
+
 
   const handleDataRequest = async (params: ExcelDataRequest) => {
     setLoading(true);
@@ -97,48 +100,7 @@ export const VehicleFleetDataPage = () => {
     }
   };
 
-  const generateChartData = (vehicles: any[]) => {
-    // Make distribution
-    const makeData = vehicles.reduce((acc, vehicle) => {
-      const make = vehicle.Make || 'Unknown';
-      acc[make] = (acc[make] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
 
-    // Year distribution
-    const yearData = vehicles.reduce((acc, vehicle) => {
-      const year = vehicle.Year || 'Unknown';
-      acc[year] = (acc[year] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-
-    // Cost distribution
-    const costData = vehicles.reduce((acc, vehicle) => {
-      const cost = vehicle.Cost || 0;
-      const range = cost < 30000 ? '<$30k' : 
-                   cost < 50000 ? '$30k-$50k' : 
-                   cost < 75000 ? '$50k-$75k' : '>$75k';
-      acc[range] = (acc[range] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-
-    // Location distribution
-    const locationData = vehicles.reduce((acc, vehicle) => {
-      const location = vehicle.Location || 'Unknown';
-      acc[location] = (acc[location] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-
-    setChartData({
-      makeChart: Object.entries(makeData).map(([name, value]) => ({ name, value })).slice(0, 10),
-      yearChart: Object.entries(yearData).map(([name, value]) => ({ 
-        name: parseInt(name) || 0, 
-        value 
-      })).sort((a, b) => a.name - b.name).slice(0, 15),
-      costChart: Object.entries(costData).map(([name, value]) => ({ name, value })),
-      locationChart: Object.entries(locationData).map(([name, value]) => ({ name, value })).slice(0, 10),
-    });
-  };
 
   const calculateSummaryStats = () => {
     if (!data?.data) return null;
@@ -185,7 +147,10 @@ export const VehicleFleetDataPage = () => {
       </div>
 
       {/* Analytics Overview */}
-      <QuickStatsCards />
+      <QuickStatsCards 
+        pageType="vehicle-fleet" 
+        onAnalysisDataLoaded={handleAnalysisDataLoaded}
+      />
 
       <Tabs defaultValue="data" className="w-full">
         <TabsList>
@@ -211,93 +176,117 @@ export const VehicleFleetDataPage = () => {
             fileKey="vehicle_fleet_master_data"
             filename="vehicle_fleet_master_data.xlsx"
           />
-          {/* Fleet Distribution Charts */}
-          <div className="grid gap-6 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Fleet by Make</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <RechartsPieChart>
-                      <Pie
-                        data={chartData.makeChart || []}
-                        cx="50%"
-                        cy="50%"
-                        outerRadius={80}
-                        fill="#8884d8"
-                        dataKey="value"
-                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                      >
-                        {(chartData.makeChart || []).map((entry: any, index: number) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                    </RechartsPieChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Fleet by Year</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartData.yearChart || []}>
-                      <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                      <XAxis dataKey="name" className="text-xs" />
-                      <YAxis className="text-xs" />
-                      <Tooltip />
-                      <Bar dataKey="value" fill="hsl(var(--primary))" radius={[2, 2, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Cost Distribution</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartData.costChart || []}>
-                      <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                      <XAxis dataKey="name" className="text-xs" />
-                      <YAxis className="text-xs" />
-                      <Tooltip />
-                      <Bar dataKey="value" fill="hsl(var(--primary))" radius={[2, 2, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
+          {/* Vehicle Replacement Analysis Visualizations */}
+          {analysisData && (
+            <div className="space-y-6">
+              <h3 className="text-lg font-semibold">Vehicle Replacement Analysis</h3>
+              
+              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                {/* Top Categories by 2026 Replacement Cost */}
+                <Card className="lg:col-span-2">
+                  <CardHeader>
+                    <CardTitle>Top Vehicle Categories by Replacement Cost (2026)</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {analysisData?.values ? (
+                      <ResponsiveContainer width="100%" height={350}>
+                        <BarChart data={Object.entries(analysisData.values).map(([category, data]: [string, any]) => ({
+                          name: category.replace(/_/g, ' '),
+                          cost: data['2026 Replacement Cost (Est.)'] || 0,
+                          count: data['2026 Vehicle Count'] || 0
+                        })).sort((a, b) => b.cost - a.cost).slice(0, 12)}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} fontSize={11} />
+                          <YAxis tickFormatter={(value) => `$${(value / 1000000).toFixed(1)}M`} />
+                          <Tooltip formatter={(value: number) => [`$${value.toLocaleString()}`, 'Replacement Cost']} />
+                          <Bar dataKey="cost" fill="#3b82f6" radius={[2, 2, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="flex items-center justify-center h-48 text-muted-foreground">
+                        No analysis data available
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Fleet by Location</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartData.locationChart || []}>
-                      <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                      <XAxis dataKey="name" className="text-xs" angle={-45} textAnchor="end" height={80} />
-                      <YAxis className="text-xs" />
-                      <Tooltip />
-                      <Bar dataKey="value" fill="hsl(var(--primary))" radius={[2, 2, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+                {/* Vehicle Count Distribution */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Vehicle Count Distribution (2026)</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {analysisData?.values ? (
+                      <ResponsiveContainer width="100%" height={350}>
+                        <RechartsPieChart>
+                          <Pie
+                            data={Object.entries(analysisData.values).map(([category, data]: [string, any]) => ({
+                              name: category.replace(/_/g, ' '),
+                              value: data['2026 Vehicle Count'] || 0
+                            })).filter(item => item.value > 0).sort((a, b) => b.value - a.value).slice(0, 8)}
+                            cx="50%"
+                            cy="50%"
+                            labelLine={false}
+                            label={({ name, percent }) => percent > 5 ? `${name}\n${(percent * 100).toFixed(0)}%` : ''}
+                            outerRadius={100}
+                            fill="#8884d8"
+                            dataKey="value"
+                          >
+                            {Object.entries(analysisData.values).map((_: any, index: number) => (
+                              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip formatter={(value: number) => [`${value} vehicles`, 'Count']} />
+                        </RechartsPieChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="flex items-center justify-center h-48 text-muted-foreground">
+                        No analysis data available
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Year-over-Year Trend Analysis */}
+                <Card className="lg:col-span-3">
+                  <CardHeader>
+                    <CardTitle>Total Replacement Cost Trend (2026-2035)</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {analysisData?.grand_total ? (
+                      <ResponsiveContainer width="100%" height={300}>
+                        <BarChart data={Object.entries(analysisData.grand_total)
+                          .filter(([key]) => key.includes('Replacement Cost'))
+                          .map(([key, value]) => ({
+                            year: key.split(' ')[0],
+                            cost: value as number,
+                            count: analysisData.grand_total[key.replace('Replacement Cost (Est.)', 'Vehicle Count')] || 0
+                          }))}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="year" />
+                          <YAxis yAxisId="cost" orientation="left" tickFormatter={(value) => `$${(value / 1000000).toFixed(0)}M`} />
+                          <YAxis yAxisId="count" orientation="right" />
+                          <Tooltip 
+                            formatter={(value: number, name: string) => [
+                              name === 'cost' ? `$${value.toLocaleString()}` : `${value} vehicles`,
+                              name === 'cost' ? 'Replacement Cost' : 'Vehicle Count'
+                            ]} 
+                          />
+                          <Bar yAxisId="cost" dataKey="cost" fill="#10b981" name="cost" radius={[2, 2, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="flex items-center justify-center h-48 text-muted-foreground">
+                        No trend data available
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+            )}
         </TabsContent>
       </Tabs>
 

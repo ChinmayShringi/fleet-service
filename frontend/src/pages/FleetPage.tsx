@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/table';
 import { Search, Filter, Download, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { ColumnVisibilityControl } from '@/components/fleet/ColumnVisibilityControl';
-import { apiService, VehicleData } from '@/services/apiService';
+import { fleetService, FleetVehicle, FleetDataRequest } from '@/services/fleetService';
 import { toast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
@@ -30,19 +30,33 @@ const COLORS = ['#f97316', '#ea580c', '#c2410c', '#9a3412', '#7c2d12'];
 
 export const FleetPage: React.FC = () => {
   const navigate = useNavigate();
-  const [vehicles, setVehicles] = useState<VehicleData[]>([]);
-  const [filteredVehicles, setFilteredVehicles] = useState<VehicleData[]>([]);
+  const [vehicles, setVehicles] = useState<FleetVehicle[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(50);
-  const [sortField, setSortField] = useState<keyof VehicleData>('Equipment');
+  const [sortField, setSortField] = useState<keyof FleetVehicle>('Equipment');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [selectedFilters, setSelectedFilters] = useState({
     make: '',
     year: '',
     location: '',
+    status: '',
+    department: '',
+    fuel_type: '',
   });
+  
+  // Backend pagination data
+  const [totalCount, setTotalCount] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [hasNext, setHasNext] = useState(false);
+  const [hasPrevious, setHasPrevious] = useState(false);
+  
+  // Summary data for charts
+  const [summaryData, setSummaryData] = useState<any>(null);
+  
+  // Filter options
+  const [filterOptions, setFilterOptions] = useState<any>(null);
 
   const [columns, setColumns] = useState<Column[]>([
     { key: 'Equipment', label: 'Equipment', visible: true },
@@ -54,145 +68,196 @@ export const FleetPage: React.FC = () => {
     { key: 'Status', label: 'Status', visible: true },
   ]);
 
-  useEffect(() => {
-    const fetchVehicles = async () => {
-      try {
-        const response = await apiService.getVehicleFleetData();
-        if (response.success && response.data) {
-          // API returns { data: VehicleData[], columns: string[], row_count: number }
-          const vehicleData = response.data.data || [];
-          setVehicles(vehicleData);
-          setFilteredVehicles(vehicleData);
-          
-          if (vehicleData.length > 0) {
-            toast({
-              title: "Data Loaded",
-              description: `Loaded ${response.data.row_count || vehicleData.length} vehicles from server`,
-            });
-          }
-        } else {
-          // Generate demo data for testing
-          const demoData = Array.from({ length: 500 }, (_, i) => ({
-            Equipment: `FL-${String(i + 1).padStart(4, '0')}`,
-            Make: ['Ford', 'Chevrolet', 'Toyota', 'Honda', 'Nissan'][i % 5],
-            Model: ['F-150', 'Silverado', 'Camry', 'Accord', 'Altima'][i % 5],
-            Year: 2018 + (i % 6),
-            Cost: Math.floor(Math.random() * 50000) + 20000,
-            Location: ['Newark', 'Trenton', 'Camden', 'Paterson', 'Edison'][i % 5],
-            Status: ['Active', 'Maintenance', 'Inactive'][i % 3],
-          }));
-          setVehicles(demoData);
-          setFilteredVehicles(demoData);
-          
-          toast({
-            title: "Demo Mode",
-            description: "Using demo data - upload fleet data to see real information",
-            variant: "default",
-          });
-        }
-      } catch (error) {
-        // Generate demo data on error
-        const demoData = Array.from({ length: 500 }, (_, i) => ({
-          Equipment: `FL-${String(i + 1).padStart(4, '0')}`,
-          Make: ['Ford', 'Chevrolet', 'Toyota', 'Honda', 'Nissan'][i % 5],
-          Model: ['F-150', 'Silverado', 'Camry', 'Accord', 'Altima'][i % 5],
-          Year: 2018 + (i % 6),
-          Cost: Math.floor(Math.random() * 50000) + 20000,
-          Location: ['Newark', 'Trenton', 'Camden', 'Paterson', 'Edison'][i % 5],
-          Status: ['Active', 'Maintenance', 'Inactive'][i % 3],
-        }));
-        setVehicles(demoData);
-        setFilteredVehicles(demoData);
+  // Fetch fleet data with current filters and pagination
+  const fetchFleetData = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      
+      const params: FleetDataRequest = {
+        page: currentPage,
+        limit: itemsPerPage,
+        search: searchTerm || undefined,
+        make: selectedFilters.make || undefined,
+        year: selectedFilters.year ? parseInt(selectedFilters.year) : undefined,
+        location: selectedFilters.location || undefined,
+        status: selectedFilters.status || undefined,
+        department: selectedFilters.department || undefined,
+        fuel_type: selectedFilters.fuel_type || undefined,
+        sort_by: sortField,
+        sort_order: sortDirection,
+      };
+      
+      console.log('Fetching fleet data with params:', params);
+      
+      const response = await fleetService.getFleetData(params);
+      
+      if (response.success) {
+        setVehicles(response.data);
+        setTotalCount(response.total_count);
+        setTotalPages(response.total_pages);
+        setHasNext(response.has_next);
+        setHasPrevious(response.has_previous);
         
         toast({
-          title: "Connection Error",
-          description: "Unable to connect to server, showing demo data",
+          title: "Fleet Data Loaded",
+          description: `Loaded ${response.data.length} vehicles (page ${response.page} of ${response.total_pages})`,
+        });
+        
+        console.log(`Fleet data loaded: ${response.data.length} vehicles on page ${response.page}`);
+      } else {
+        toast({
+          title: "Error Loading Fleet Data",
+          description: response.message || "Failed to load fleet data",
           variant: "destructive",
         });
-      } finally {
-        setIsLoading(false);
       }
-    };
+    } catch (error) {
+      console.error('Error fetching fleet data:', error);
+      toast({
+        title: "Connection Error",
+        description: "Unable to connect to fleet management server",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [currentPage, itemsPerPage, searchTerm, selectedFilters, sortField, sortDirection]);
+  
+  // Fetch summary data for charts
+  const fetchSummaryData = async () => {
+    try {
+      const response = await fleetService.getFleetSummary();
+      if (response.success) {
+        setSummaryData(response.summary);
+      }
+    } catch (error) {
+      console.error('Error fetching summary data:', error);
+    }
+  };
+  
+  // Fetch filter options
+  const fetchFilterOptions = async () => {
+    try {
+      const response = await fleetService.getFilterOptions();
+      if (response.success) {
+        setFilterOptions(response.options);
+      }
+    } catch (error) {
+      console.error('Error fetching filter options:', error);
+    }
+  };
 
-    fetchVehicles();
-  }, []);
-
-  // Filter and search logic
+  // Initial data load
   useEffect(() => {
-    let filtered = vehicles.filter(vehicle => {
-      const matchesSearch = Object.values(vehicle).some(value =>
-        value?.toString().toLowerCase().includes(searchTerm.toLowerCase())
-      );
-      
-      const matchesMake = !selectedFilters.make || vehicle.Make === selectedFilters.make;
-      const matchesYear = !selectedFilters.year || vehicle.Year.toString() === selectedFilters.year;
-      const matchesLocation = !selectedFilters.location || vehicle.Location === selectedFilters.location;
-      
-      return matchesSearch && matchesMake && matchesYear && matchesLocation;
-    });
+    fetchSummaryData();
+    fetchFilterOptions();
+  }, []);
+  
+  // Fetch data when filters or pagination change
+  useEffect(() => {
+    fetchFleetData();
+  }, [fetchFleetData]);
 
-    // Sort filtered results
-    filtered.sort((a, b) => {
-      const aValue = a[sortField];
-      const bValue = b[sortField];
-      
-      if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
-      if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
-      return 0;
-    });
-
-    setFilteredVehicles(filtered);
-    setCurrentPage(1); // Reset to first page when filters change
-  }, [searchTerm, selectedFilters, vehicles, sortField, sortDirection]);
-
-  // Pagination logic
-  const totalPages = Math.ceil(filteredVehicles.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const currentVehicles = filteredVehicles.slice(startIndex, endIndex);
-
-  // Chart data generation
+  // Chart data generation from summary data
   const chartData = useMemo(() => {
-    const makeData = filteredVehicles.reduce((acc, vehicle) => {
-      acc[vehicle.Make] = (acc[vehicle.Make] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
+    if (!summaryData) {
+      return {
+        makeChart: [],
+        yearChart: [],
+        costChart: [],
+      };
+    }
 
-    const yearData = filteredVehicles.reduce((acc, vehicle) => {
-      acc[vehicle.Year] = (acc[vehicle.Year] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
+    const makeChart = Object.entries(summaryData.make_distribution || {})
+      .map(([name, value]) => ({ name, value: Number(value) }))
+      .sort((a, b) => b.value - a.value);
 
-    const costData = filteredVehicles.reduce((acc, vehicle) => {
-      const range = vehicle.Cost < 30000 ? '<$30k' : 
-                   vehicle.Cost < 50000 ? '$30k-$50k' : '>$50k';
-      acc[range] = (acc[range] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
+    const yearChart = Object.entries(summaryData.year_distribution || {})
+      .map(([name, value]) => ({ name: parseInt(name), value: Number(value) }))
+      .sort((a, b) => a.name - b.name);
+
+    const costChart = Object.entries(summaryData.cost_distribution || {})
+      .map(([name, value]) => ({ name, value }));
 
     return {
-      makeChart: Object.entries(makeData).map(([name, value]) => ({ name, value })),
-      yearChart: Object.entries(yearData).map(([name, value]) => ({ name: parseInt(name), value })).sort((a, b) => a.name - b.name),
-      costChart: Object.entries(costData).map(([name, value]) => ({ name, value })),
+      makeChart,
+      yearChart,
+      costChart,
     };
-  }, [filteredVehicles]);
+  }, [summaryData]);
 
-  const getStatusBadge = (vehicle: VehicleData) => {
+  const getStatusBadge = (vehicle: FleetVehicle) => {
     const status = vehicle.Status || 'Active';
     const variants: Record<string, any> = {
       'Active': 'default',
       'Maintenance': 'warning',
-      'Inactive': 'secondary'
+      'Inactive': 'secondary',
+      'Out of Service': 'destructive'
     };
     return <Badge variant={variants[status] || 'default'}>{status}</Badge>;
   };
 
-  const handleSort = (field: keyof VehicleData) => {
+  const handleSort = (field: keyof FleetVehicle) => {
     if (sortField === field) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
     } else {
       setSortField(field);
       setSortDirection('asc');
+    }
+  };
+  
+  const handleFilterChange = (filterKey: string, value: string) => {
+    setSelectedFilters(prev => ({
+      ...prev,
+      [filterKey]: value
+    }));
+    setCurrentPage(1); // Reset to first page when filters change
+  };
+  
+  const handleClearFilters = () => {
+    setSelectedFilters({
+      make: '',
+      year: '',
+      location: '',
+      status: '',
+      department: '',
+      fuel_type: '',
+    });
+    setCurrentPage(1);
+  };
+  
+  const handleExport = async (format: 'excel' | 'csv' = 'excel') => {
+    try {
+      const params: FleetDataRequest = {
+        search: searchTerm || undefined,
+        make: selectedFilters.make || undefined,
+        year: selectedFilters.year ? parseInt(selectedFilters.year) : undefined,
+        location: selectedFilters.location || undefined,
+        status: selectedFilters.status || undefined,
+        department: selectedFilters.department || undefined,
+        fuel_type: selectedFilters.fuel_type || undefined,
+      };
+      
+      const response = await fleetService.exportFleetData(format, params);
+      
+      if (response.success) {
+        toast({
+          title: "Export Successful",
+          description: `Exported ${response.record_count} vehicles to ${response.filename}`,
+        });
+      } else {
+        toast({
+          title: "Export Failed",
+          description: response.message,
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Export Error",
+        description: "Failed to export fleet data",
+        variant: "destructive",
+      });
     }
   };
 
@@ -202,12 +267,6 @@ export const FleetPage: React.FC = () => {
       description: `Filtering table based on ${chartType} data`,
     });
     // Could implement specific filtering based on chart interaction
-  };
-
-  const uniqueValues = {
-    makes: [...new Set(vehicles.map(v => v.Make))].sort(),
-    years: [...new Set(vehicles.map(v => v.Year))].sort((a, b) => b - a),
-    locations: [...new Set(vehicles.map(v => v.Location))].sort(),
   };
 
   if (isLoading) {
@@ -245,7 +304,7 @@ export const FleetPage: React.FC = () => {
             <BarChart className="w-4 h-4 mr-2" />
             View Analytics
           </Button>
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" onClick={() => handleExport('excel')}>
             <Download className="w-4 h-4 mr-2" />
             Export
           </Button>
@@ -329,7 +388,7 @@ export const FleetPage: React.FC = () => {
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>Vehicle Fleet ({filteredVehicles.length.toLocaleString()} vehicles)</CardTitle>
+            <CardTitle>Vehicle Fleet ({totalCount.toLocaleString()} vehicles)</CardTitle>
             <div className="flex items-center space-x-2">
               <ColumnVisibilityControl 
                 columns={columns} 
@@ -353,49 +412,62 @@ export const FleetPage: React.FC = () => {
             <div className="flex items-center space-x-2">
               <Filter className="w-4 h-4 text-muted-foreground" />
               <Select value={selectedFilters.make || 'all'} onValueChange={(value) => 
-                setSelectedFilters(prev => ({ ...prev, make: value === 'all' ? '' : value }))}>
+                handleFilterChange('make', value === 'all' ? '' : value)}>
                 <SelectTrigger className="w-32">
                   <SelectValue placeholder="Make" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Makes</SelectItem>
-                  {uniqueValues.makes.map(make => (
+                  {(filterOptions?.makes || []).map((make: string) => (
                     <SelectItem key={make} value={make}>{make}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
               
               <Select value={selectedFilters.year || 'all'} onValueChange={(value) => 
-                setSelectedFilters(prev => ({ ...prev, year: value === 'all' ? '' : value }))}>
+                handleFilterChange('year', value === 'all' ? '' : value)}>
                 <SelectTrigger className="w-32">
                   <SelectValue placeholder="Year" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Years</SelectItem>
-                  {uniqueValues.years.map(year => (
+                  {(filterOptions?.years || []).map((year: number) => (
                     <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
               
               <Select value={selectedFilters.location || 'all'} onValueChange={(value) => 
-                setSelectedFilters(prev => ({ ...prev, location: value === 'all' ? '' : value }))}>
+                handleFilterChange('location', value === 'all' ? '' : value)}>
                 <SelectTrigger className="w-32">
                   <SelectValue placeholder="Location" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Locations</SelectItem>
-                  {uniqueValues.locations.map(location => (
+                  {(filterOptions?.locations || []).map((location: string) => (
                     <SelectItem key={location} value={location}>{location}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
               
-              {(selectedFilters.make || selectedFilters.year || selectedFilters.location) && (
+              <Select value={selectedFilters.status || 'all'} onValueChange={(value) => 
+                handleFilterChange('status', value === 'all' ? '' : value)}>
+                <SelectTrigger className="w-32">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  {(filterOptions?.statuses || []).map((status: string) => (
+                    <SelectItem key={status} value={status}>{status}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              
+              {(selectedFilters.make || selectedFilters.year || selectedFilters.location || selectedFilters.status || selectedFilters.department || selectedFilters.fuel_type) && (
                 <Button 
                   variant="outline" 
                   size="sm" 
-                  onClick={() => setSelectedFilters({ make: '', year: '', location: '' })}
+                  onClick={handleClearFilters}
                 >
                   Clear Filters
                 </Button>
@@ -413,7 +485,7 @@ export const FleetPage: React.FC = () => {
                     <TableHead 
                       key={column.key}
                       className="cursor-pointer hover:bg-muted"
-                      onClick={() => handleSort(column.key as keyof VehicleData)}
+                      onClick={() => handleSort(column.key as keyof FleetVehicle)}
                     >
                       <div className="flex items-center space-x-1">
                         <span>{column.label}</span>
@@ -428,8 +500,8 @@ export const FleetPage: React.FC = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {currentVehicles.map((vehicle, index) => (
-                  <TableRow key={index} className="hover:bg-muted/50">
+                {vehicles.map((vehicle, index) => (
+                  <TableRow key={`${vehicle.Equipment}-${index}`} className="hover:bg-muted/50">
                     {columns.filter(col => col.visible).map(column => (
                       <TableCell key={column.key}>
                         {column.key === 'Cost' ? (
@@ -439,7 +511,7 @@ export const FleetPage: React.FC = () => {
                         ) : column.key === 'Make' ? (
                           <span className="font-medium">{vehicle.Make} {vehicle.Model}</span>
                         ) : (
-                          vehicle[column.key as keyof VehicleData]?.toString() || '-'
+                          vehicle[column.key as keyof FleetVehicle]?.toString() || '-'
                         )}
                       </TableCell>
                     ))}
@@ -453,7 +525,7 @@ export const FleetPage: React.FC = () => {
           <div className="flex items-center justify-between mt-4">
             <div className="flex items-center space-x-2">
               <span className="text-sm text-muted-foreground">
-                Showing {startIndex + 1}-{Math.min(endIndex, filteredVehicles.length)} of {filteredVehicles.length.toLocaleString()} vehicles
+                Showing {((currentPage - 1) * itemsPerPage) + 1}-{Math.min(currentPage * itemsPerPage, totalCount)} of {totalCount.toLocaleString()} vehicles
               </span>
               <Select value={itemsPerPage.toString()} onValueChange={(value) => {
                 setItemsPerPage(parseInt(value));
@@ -476,7 +548,7 @@ export const FleetPage: React.FC = () => {
                 variant="outline"
                 size="sm"
                 onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                disabled={currentPage === 1}
+                disabled={!hasPrevious || isLoading}
               >
                 <ChevronLeft className="w-4 h-4" />
                 Previous
@@ -485,6 +557,7 @@ export const FleetPage: React.FC = () => {
               <div className="flex items-center space-x-1">
                 {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                   const pageNum = Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i;
+                  if (pageNum > totalPages) return null;
                   return (
                     <Button
                       key={pageNum}
@@ -492,6 +565,7 @@ export const FleetPage: React.FC = () => {
                       size="sm"
                       onClick={() => setCurrentPage(pageNum)}
                       className="w-8 h-8 p-0"
+                      disabled={isLoading}
                     >
                       {pageNum}
                     </Button>
@@ -503,7 +577,7 @@ export const FleetPage: React.FC = () => {
                 variant="outline"
                 size="sm"
                 onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                disabled={currentPage === totalPages}
+                disabled={!hasNext || isLoading}
               >
                 Next
                 <ChevronRight className="w-4 h-4" />

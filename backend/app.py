@@ -20,6 +20,7 @@ from routes.auth_routes import auth_bp
 from routes.excel_data_routes import excel_data_bp
 from routes.analytics_routes import analytics_bp
 from routes.equipment_routes import equipment_bp
+from routes.fleet_routes import fleet_bp
 
 # Import services
 from services.user_service import UserService
@@ -42,6 +43,7 @@ def create_app():
     app.register_blueprint(excel_data_bp)
     app.register_blueprint(analytics_bp)
     app.register_blueprint(equipment_bp)
+    app.register_blueprint(fleet_bp)
     
     return app
 

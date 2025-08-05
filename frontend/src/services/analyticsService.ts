@@ -17,6 +17,14 @@ export interface QuickStats {
   unique_locations: number;
 }
 
+export interface QuickStatsResponse {
+  quick_stats: QuickStats;
+  page_type: string;
+  analysis_type: string;
+  analysis_success: boolean;
+  analysis_data: any; // Full analysis data from the script
+}
+
 export interface VehicleAnalytics {
   total_vehicles: number;
   total_value: number;
@@ -129,15 +137,10 @@ class AnalyticsService {
     }
   }
 
-  async getQuickStats(): Promise<ApiResponse<QuickStats>> {
-    const response = await this.request<{ quick_stats: QuickStats }>('/quick-stats');
-    if (response.success && response.data) {
-      return {
-        success: true,
-        data: response.data.quick_stats
-      };
-    }
-    return response as ApiResponse<QuickStats>;
+  async getQuickStats(pageType?: string): Promise<ApiResponse<QuickStatsResponse>> {
+    const endpoint = pageType ? `/quick-stats?page=${pageType}` : '/quick-stats';
+    const response = await this.request<QuickStatsResponse>(endpoint);
+    return response;
   }
 
   async getVehicleAnalytics(): Promise<ApiResponse<VehicleAnalytics>> {
